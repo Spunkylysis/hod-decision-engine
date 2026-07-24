@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HoD Decision Engine — Phase 4</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0d1117;color:#e2e4ee;min-height:100vh;padding:20px;max-width:1080px;margin:0 auto}
+.hdr{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #1e2535}
+.hdr-title{font-size:15px;font-weight:600;color:#c0c4d4}
+.hdr-sub{font-size:11px;color:#445;margin-top:2px}
+.dot{width:8px;height:8px;border-radius:50%;background:#445;flex-shrink:0}
+.dot.ok{background:#1baf7a}.dot.err{background:#f57373}
+.steps{display:flex;margin-bottom:24px;border-radius:8px;overflow:hidden;border:1px solid #1e2535}
+.step{flex:1;padding:10px 14px;font-size:11px;font-weight:500;color:#445;background:#111720;cursor:pointer;border-right:1px solid #1e2535;transition:all .15s;text-align:center}
+.step:last-child{border-right:none}
+.step.active{background:#1a2744;color:#7ab3f5;border-bottom:2px solid #2a78d6}
+.step-num{display:block;font-size:16px;margin-bottom:2px}
+.panel{display:none}.panel.active{display:block}
+.section{background:#111720;border:1px solid #1e2535;border-radius:8px;padding:16px;margin-bottom:12px}
+.stitle{font-size:11px;font-weight:600;color:#778;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+label{font-size:11px;color:#778;min-width:100px;flex-shrink:0}
+input[type=text],select{background:#0d1117;border:1px solid #252f40;border-radius:5px;color:#c0c4d4;font-size:12px;padding:7px 10px;width:100%;max-width:360px}
+input[type=text]:focus,select:focus{outline:none;border-color:#2a78d6}
+.btn{padding:8px 18px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:#2a78d6;color:#fff}.btn-primary:hover{background:#185fa5}
+.btn-primary:disabled{background:#1e2535;color:#445;cursor:not-allowed}
+.btn-secondary{background:#111720;color:#778;border:1px solid #252f40}
+.btn-secondary:hover{border-color:#2a78d6;color:#7ab3f5}
+.btn-run{background:linear-gradient(135deg,#1baf7a,#2a78d6);color:#fff;padding:12px 28px;font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;transition:all .15s}
+.btn-run:disabled{background:#1e2535;color:#445;cursor:not-allowed}
+.btn-run:hover:not(:disabled){opacity:.9}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+/* Status cards */
+.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.sc{background:#0d1117;border:1px solid #1e2535;border-radius:6px;padding:10px 12px}
+.sc.ok{border-color:#1a4228;background:#0a1210}
+.sc.warn{border-color:#4a2010;background:#180a00}
+.sc.stale{border-color:#4a3a10;background:#181200}
+.sc-label{font-size:9px;color:#445;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.sc-val{font-size:16px;font-weight:600;color:#c0c4d4}
+.sc-val.pos{color:#4ade80}.sc-val.neg{color:#f57373}.sc-val.warn{color:#f5a742}
+.sc-sub{font-size:10px;color:#445;margin-top:2px}
+/* Log */
+.log{background:#0d1117;border:1px solid #1e2535;border-radius:6px;padding:12px;font-family:monospace;font-size:11px;max-height:160px;overflow-y:auto}
+.log-ok{color:#4ade80}.log-warn{color:#f5a742}.log-err{color:#f57373}
+.log-info{color:#7ab3f5}.log-dim{color:#445}
+/* Gap table */
+.gtable{width:100%;border-collapse:collapse;font-size:11px}
+.gtable th{text-align:left;color:#445;font-weight:500;padding:6px 8px;border-bottom:1px solid #1e2535;text-transform:uppercase;font-size:9px;letter-spacing:.6px}
+.gtable td{padding:6px 8px;border-bottom:1px solid #111720;color:#778}
+.gtable tr:hover td{background:#111720}
+.gtable td:first-child{color:#c0c4d4;font-weight:500}
+.mini-bar{height:5px;background:#1e2535;border-radius:2px;overflow:hidden;display:inline-block;width:70px;vertical-align:middle}
+.mini-fill{height:100%;border-radius:2px}
+.rb{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600}
+.rb-elite{background:#0a1f12;color:#4ade80;border:1px solid #1a4228}
+.rb-high{background:#0e1828;color:#7ab3f5;border:1px solid #2a78d6}
+.rb-med{background:#0e0e22;color:#a78bfa;border:1px solid #4a3aa7}
+.rb-low{background:#1a1a1a;color:#445;border:1px solid #252525}
+.rb-struct{background:#180a00;color:#f87171;border:1px solid #4a2010}
+/* Profiler */
+.q-label{font-size:11px;font-weight:600;color:#c0c4d4;margin-bottom:3px}
+.q-sub{font-size:10px;color:#445;margin-bottom:7px;line-height:1.5}
+.btn-group{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px}
+.qbtn{padding:5px 10px;border-radius:5px;border:1px solid #252f40;background:#0d1117;color:#778;font-size:11px;cursor:pointer;transition:all .15s}
+.qbtn:hover{border-color:#2a78d6;color:#7ab3f5}
+.qbtn.selected{background:#1a2744;border-color:#2a78d6;color:#7ab3f5;font-weight:600}
+.schism{font-size:10px;min-height:14px;margin-bottom:6px}
+.schism-high{color:#f57373}.schism-ok{color:#4ade80}
+/* Player picker */
+.player-card{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;background:#0d1117;border:1px solid #1e2535;margin-bottom:5px;cursor:pointer;transition:all .15s}
+.player-card:hover{border-color:#252f40;background:#111720}
+.player-card.selected-give{border-color:#dc2626;background:#180808}
+.player-card.selected-recv{border-color:#2a78d6;background:#08101a}
+.pc-check{width:14px;height:14px;border-radius:3px;border:1px solid #445;background:#0d1117;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.pc-check.give{border-color:#dc2626;background:#dc2626;color:#fff}
+.pc-check.recv{border-color:#2a78d6;background:#2a78d6;color:#fff}
+.pc-name{font-size:12px;color:#c0c4d4;font-weight:500;flex:1}
+.pc-pos{font-size:10px;color:#445;width:40px}
+.pc-pts{font-size:11px;color:#778;width:70px;text-align:right}
+.pc-sal{font-size:10px;color:#445;width:55px;text-align:right}
+.pc-contract{font-size:10px;color:#445;width:30px;text-align:center}
+/* Pareto bars */
+.pbar-wrap{height:28px;border-radius:5px;overflow:hidden;background:#1e2535;position:relative;margin-bottom:6px}
+.pbar-fill{height:100%;display:flex;align-items:center;padding-left:10px;transition:width .4s}
+.pbar-label{font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
+.pbar-sweet{position:absolute;top:0;height:100%;background:#7c3aed;opacity:.85;transition:left .4s,width .4s}
+/* Bias bars */
+.bias-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:5px;background:#0e0e22;border:1px solid #252535;margin-bottom:5px}
+/* Admin accordion */
+.admin-toggle{background:#0d1117;border:1px solid #1e2535;border-radius:8px;padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:11px;color:#445}
+.admin-toggle:hover{border-color:#252f40;color:#778}
+.admin-body{display:none}
+.admin-body.open{display:block}
+/* Upload zones */
+.uz{border:2px dashed #252f40;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;position:relative;margin-bottom:8px}
+.uz:hover,.uz.drag{border-color:#2a78d6;background:#0e1828}
+.uz.loaded{border-color:#1a4228;background:#0a1210;border-style:solid}
+.uz input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.uz-title{font-size:12px;font-weight:600;color:#c0c4d4;margin-bottom:2px}
+.uz-sub{font-size:10px;color:#445}
+.uz-ok{color:#4ade80;font-weight:500}
+.pos-chip{padding:3px 8px;border-radius:12px;border:1px solid #252f40;background:#0d1117;color:#445;font-size:10px;font-weight:500;cursor:pointer;transition:all .12s}
+.pos-chip:hover{border-color:#2a78d6;color:#7ab3f5}
+.pos-chip.active{background:#1a2744;border-color:#2a78d6;color:#7ab3f5;font-weight:600}
+.cat-chip{padding:3px 8px;border-radius:12px;border:1px solid #252f40;background:#0d1117;color:#445;font-size:10px;cursor:pointer;transition:all .12s}
+.cat-chip:hover{border-color:#a78bfa;color:#a78bfa}
+.cat-chip.active{background:#1a1030;border-color:#a78bfa;color:#c084fc;font-weight:600}
+.cat-chip[style*="f87171"].active{background:#1a0808;border-color:#dc2626;color:#f87171;font-weight:600}
+.flow-step{flex:1;padding:10px 12px;background:#111720;border:1px solid #1e2535;text-align:center;border-right:none}
+.flow-step:first-of-type{border-radius:6px 0 0 6px}
+.flow-step:last-of-type{border-radius:0 6px 6px 0;border-right:1px solid #1e2535}
+.flow-step.flow-active{background:#1a2744;border-color:#2a78d6}
+.flow-step.flow-done{background:#0a1210;border-color:#1a4228}
+.flow-step.flow-ready{background:#1a1030;border-color:#7c3aed}
+.flow-num{font-size:18px;font-weight:700;color:#445;margin-bottom:2px}
+.flow-step.flow-active .flow-num{color:#7ab3f5}
+.flow-step.flow-done .flow-num{color:#4ade80}
+.flow-step.flow-ready .flow-num{color:#a78bfa}
+.flow-label{font-size:11px;font-weight:600;color:#445}
+.flow-step.flow-active .flow-label{color:#c0c4d4}
+.flow-step.flow-done .flow-label{color:#4ade80}
+.flow-step.flow-ready .flow-label{color:#c084fc}
+.flow-sub{font-size:9px;color:#445;margin-top:2px}
+.flow-arrow{display:flex;align-items:center;padding:0 6px;color:#2a3555;font-size:16px;background:#0d1117}
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Trade section */
+.trade-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.trade-card{background:#0d1117;border:1px solid #1e2535;border-radius:8px;padding:14px}
+.tc-title{font-size:11px;font-weight:600;color:#c0c4d4;margin-bottom:10px}
+.tc-row{display:flex;justify-content:space-between;margin-bottom:5px}
+.tc-label{font-size:11px;color:#556}
+.tc-val{font-size:11px;font-weight:600;color:#c0c4d4}
+/* Prog */
+.prog{height:4px;background:#1e2535;border-radius:2px;overflow:hidden;margin-bottom:10px}
+.prog-fill{height:100%;background:linear-gradient(90deg,#1baf7a,#2a78d6);border-radius:2px;transition:width .3s}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="dot" id="connDot"></div>
+  <div>
+    <div class="hdr-title">HoD Decision Engine</div>
+    <div class="hdr-sub" id="connStatus">Not connected</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <span style="font-size:10px;color:#445" id="dataAge"></span>
+    <button class="btn btn-secondary" id="testConnBtn" style="font-size:11px;padding:5px 12px">Connect</button>
+  </div>
+</div>
+
+<div class="steps">
+  <div class="step active" id="s1" data-step="1"><span class="step-num">①</span>Configure</div>
+  <div class="step" id="s2" data-step="2"><span class="step-num">②</span>Profiles</div>
+  <div class="step" id="s3" data-step="3"><span class="step-num">③</span>Analysis</div>
+</div>
+
+<!-- ══ STEP 1: CONFIGURE ══════════════════════════════════════ -->
+<div class="panel active" id="panel-1">
+  <div class="section">
+    <div class="stitle">🔌 Supabase Connection</div>
+    <div class="row"><label>Project URL</label>
+      <input type="text" id="sbUrl" value="https://rlwidfirrdwolaywjpca.supabase.co"></div>
+    <div class="row"><label>Anon Key</label>
+      <input type="text" id="sbKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsd2lkZmlycmR3b2xheXdqcGNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzU4MjQsImV4cCI6MjA5NTQxMTgyNH0.OFUPCldB5T91_brqxaSWOBFzgK0as-jGGcNy-AKhGwU"></div>
+    <div class="row"><label>Your team</label>
+      <select id="myTeamSelect" style="max-width:260px">
+        <option value="BDE">DirkDiggler — BDE</option>
+        <option value="PALADINS">Philadelphia Paladins</option>
+        <option value="DEATHSTROKE">San Diego Deathstroke</option>
+        <option value="RIDDLE">Riddle me This</option>
+        <option value="MASTERCHIEF">Master Chief</option>
+        <option value="RICKGRIMES">Rick Grimes</option>
+        <option value="PRIMEEVILS">The Prime Evils</option>
+        <option value="XENOMORPH">XENOMORPH</option>
+        <option value="STARLORD">Star Lord</option>
+        <option value="DUKENUKEM">Duke Nukem</option>
+        <option value="CRAZYHORSE">Crazyhorse</option>
+        <option value="HARU">Haru's Throwing Stars</option>
+        <option value="MILLERS">Minneapolis Millers</option>
+        <option value="IRONFIST">Iron Fisting</option>
+      </select>
+    </div>
+    <button class="btn btn-secondary" id="testConnBtn" style="margin-top:4px">Test Connection</button>
+    <div id="connResult" style="font-size:11px;color:#445;margin-top:8px;line-height:1.8"></div>
+  </div>
+
+  <div class="section" id="dataStatusSection" style="display:none">
+    <div class="stitle">📊 Data Status
+      <span style="font-size:10px;font-weight:400;color:#445;margin-left:4px">Refreshed by Fantrax ETL — no uploads needed for analysis</span>
+    </div>
+    <div class="status-grid" id="dataStatusGrid"></div>
+  </div>
+
+  <!-- ADMIN ACCORDION -->
+  <div class="admin-toggle" id="adminToggle">
+    <span style="font-size:14px">⚙</span>
+    <span>Admin — Refresh FanGraphs Prospect Ratings</span>
+    <span style="margin-left:auto;font-size:10px" id="adminChevron">▼ expand</span>
+  </div>
+  <div class="admin-body" id="adminBody">
+    <div class="section">
+      <div class="stitle">🌱 FanGraphs Prospect Ratings
+        <span style="font-size:10px;font-weight:400;color:#445;margin-left:4px">Upload monthly after FanGraphs board update</span>
+      </div>
+      <div style="font-size:11px;color:#556;margin-bottom:12px;line-height:1.7">
+        This is the only data not sourced from the Fantrax ETL pipeline.
+        Upload the FanGraphs hitters and pitchers board CSVs once per month.
+        All other data (standings, players, transactions) refreshes automatically via the ETL skill.
+      </div>
+      <div class="upload-grid">
+        <div>
+          <div style="font-size:10px;color:#445;margin-bottom:5px">Hitters Board (FanGraphs CSV)</div>
+          <div class="uz" id="uz-hitters">
+            <input type="file" accept=".csv" data-loader="hitters">
+            <div class="uz-title" id="uz-hitters-title">Hitters_fangraphs-the-board-data.csv</div>
+            <div class="uz-sub">FV, BB%, K%, wRC+, level, ETA</div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#445;margin-bottom:5px">Pitchers Board (FanGraphs CSV)</div>
+          <div class="uz" id="uz-pitchers">
+            <input type="file" accept=".csv" data-loader="pitchers">
+            <div class="uz-title" id="uz-pitchers-title">Pitchers_fangraphs-the-board-data.csv</div>
+            <div class="uz-sub">FV, BB%, K%, xFIP, GB%, level, ETA</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <button class="btn btn-secondary" id="uploadProspectsBtn" disabled style="font-size:11px;padding:6px 14px">Upload Prospect Ratings</button>
+        <span id="uploadResult" style="font-size:11px;color:#445"></span>
+      </div>
+      <div style="margin-top:10px;padding:10px 12px;border-radius:6px;background:#0e0e22;border:1px solid #252535;font-size:10px;color:#556;line-height:1.7">
+        <strong style="color:#a78bfa">Phase 5 placeholder:</strong> Statcast data (exit velocity, barrel rate, xwOBA, spin rate) will be added here via Baseball Savant API integration. Column stubs already exist in fantrax.prospect_ratings.
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="step1NextBtn" disabled data-goto="2">Next: Owner Profiles →</button>
+  </div>
+</div>
+
+<!-- ══ STEP 2: OWNER PROFILES ═════════════════════════════════ -->
+<div class="panel" id="panel-2">
+  <div class="section">
+    <div class="stitle">🎯 Owner Profiles</div>
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <button class="qbtn selected" id="mode-counterparty" data-mode="counterparty">🎯 Counterparty</button>
+      <button class="qbtn" id="mode-unknown" data-mode="unknown">❓ Unknown Owner</button>
+      <button class="qbtn" id="mode-self" data-mode="self">⚡ My Profile</button>
+    </div>
+
+    <!-- KNOWN COUNTERPARTY -->
+    <div id="mode-panel-counterparty">
+      <div class="row" style="margin-bottom:14px">
+        <label>Select owner</label>
+        <select id="profTeam" style="max-width:260px">
+          <option value="">— select counterparty —</option>
+          <option value="BDE">DirkDiggler (BDE)</option>
+          <option value="PALADINS">Philadelphia Paladins</option>
+          <option value="DEATHSTROKE">San Diego Deathstroke</option>
+          <option value="RIDDLE">Riddle me This</option>
+          <option value="MASTERCHIEF">Master Chief</option>
+          <option value="RICKGRIMES">Rick Grimes</option>
+          <option value="PRIMEEVILS">The Prime Evils</option>
+          <option value="XENOMORPH">XENOMORPH</option>
+          <option value="STARLORD">Star Lord</option>
+          <option value="DUKENUKEM">Duke Nukem</option>
+          <option value="CRAZYHORSE">Crazyhorse</option>
+          <option value="HARU">Haru's Throwing Stars</option>
+          <option value="MILLERS">Minneapolis Millers</option>
+          <option value="IRONFIST">Iron Fisting</option>
+        </select>
+        <button class="btn btn-secondary" id="saveProfileBtn" style="font-size:11px;padding:5px 12px;display:none">💾 Save</button>
+        <span id="profileSaved" style="font-size:11px;color:#4ade80;display:none">✓ Saved</span>
+      </div>
+
+      <div id="profilerQuestions" style="display:none">
+        <div style="font-size:10px;color:#7ab3f5;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">
+          Tier 1 — What you know · Changes Pareto anchor weights
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <div class="q-label">Philosophy</div>
+            <div class="q-sub">How they're approaching this season</div>
+            <div class="btn-group" id="cp-q-horizon">
+              <button class="qbtn" data-prefix="cp" data-qkey="horizon" data-qval="short">🏆 Win Now</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="horizon" data-qval="transitional">⚖️ Transitional</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="horizon" data-qval="long">🏗️ Rebuild</button>
+            </div>
+            <div class="schism" id="cp-schism-horizon"></div>
+          </div>
+          <div>
+            <div class="q-label">Target year</div>
+            <div class="q-sub">Which season's projection to weight most</div>
+            <div class="btn-group" id="cp-q-year">
+              <button class="qbtn" data-prefix="cp" data-qkey="year" data-qval="2026">2026</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="year" data-qval="2027">2027</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="year" data-qval="2028">2028</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="year" data-qval="2029+">2029+</button>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <div class="q-label">Asset preference</div>
+            <div class="q-sub">Sweetener type — prospect vs veteran</div>
+            <div class="btn-group" id="cp-q-asset">
+              <button class="qbtn" data-prefix="cp" data-qkey="asset" data-qval="prospects">🌱 Prospects</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="asset" data-qval="active_mlb">⚾ Active MLB</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="asset" data-qval="both">Both</button>
+            </div>
+            <div class="schism" id="cp-schism-asset"></div>
+          </div>
+          <div>
+            <div class="q-label">Cap situation</div>
+            <div class="q-sub">Financial pressure changes trade motivation</div>
+            <div class="btn-group" id="cp-q-cap">
+              <button class="qbtn" data-prefix="cp" data-qkey="cap" data-qval="over">🚫 Over Cap</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="cap" data-qval="tight">⚠️ Tight</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="cap" data-qval="healthy">✓ Healthy</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="cap" data-qval="flexible">💰 Flexible</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:#a78bfa;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;margin-top:4px">
+          Tier 2 — Suspected needs · Narrows offer structure
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <div class="q-label">Primary roster gap</div>
+            <div class="q-sub">Which surplus to lead with</div>
+            <div class="btn-group" id="cp-q-need">
+              <button class="qbtn" data-prefix="cp" data-qkey="need" data-qval="pitching">⚾ Pitching</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="need" data-qval="hitting">🏏 Hitting</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="need" data-qval="closer">🔒 Closer</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="need" data-qval="prospects">🌱 Prospects</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="need" data-qval="bpa">BPA</button>
+            </div>
+            <div class="schism" id="cp-schism-need"></div>
+          </div>
+          <div>
+            <div class="q-label">Risk tolerance</div>
+            <div class="q-sub">Ceiling vs floor — which Ceiling vs floor — version of assets to offer</div>
+            <div class="btn-group" id="cp-q-risk">
+              <button class="qbtn" data-prefix="cp" data-qkey="risk" data-qval="ceiling">🚀 Ceiling</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="risk" data-qval="either">⚖️ Either</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="risk" data-qval="floor">🛡 Floor</button>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <div class="q-label">Injury tolerance</div>
+            <div class="q-sub">Gates whether IR assets can appear in any package</div>
+            <div class="btn-group" id="cp-q-injury">
+              <button class="qbtn" data-prefix="cp" data-qkey="injury" data-qval="avoid">🚫 Avoid</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="injury" data-qval="accept_discount">💰 Accept w/ Discount</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="injury" data-qval="prefer_upside">⬆ Prefer Upside</button>
+            </div>
+          </div>
+          <div>
+            <div class="q-label">Trade motivation</div>
+            <div class="q-sub">Why they would deal right now</div>
+            <div class="btn-group" id="cp-q-motivation">
+              <button class="qbtn" data-prefix="cp" data-qkey="motivation" data-qval="maximize_pts">📈 Max Pts</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="motivation" data-qval="cap_relief">💰 Cap Relief</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="motivation" data-qval="build_future">🏗️ Future</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="motivation" data-qval="enjoy_competition">🎮 Competition</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:#4ade80;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;margin-top:4px">
+          Tier 3 — Engagement signals · Shapes timing and framing
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <div class="q-label">Response pattern</div>
+            <div class="q-sub">How they've responded to previous offers</div>
+            <div class="btn-group" id="cp-q-response">
+              <button class="qbtn" data-prefix="cp" data-qkey="response" data-qval="fast">⚡ Fast</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="response" data-qval="slow">🐢 Slow</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="response" data-qval="silent">🔇 Silent</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="response" data-qval="counter">↩ Always counters</button>
+            </div>
+          </div>
+          <div>
+            <div class="q-label">Offer history with my team</div>
+            <div class="q-sub">Prior trade relationship with me</div>
+            <div class="btn-group" id="cp-q-history">
+              <button class="qbtn" data-prefix="cp" data-qkey="history" data-qval="traded_before">✅ Traded before</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="history" data-qval="declined_offers">❌ Declined offers</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="history" data-qval="no_history">— No history</button>
+              <button class="qbtn" data-prefix="cp" data-qkey="history" data-qval="initiated">📨 They initiated</button>
+            </div>
+          </div>
+        </div>
+        <div id="profilerRec" style="display:none;padding:12px;border-radius:6px;background:#0a1210;border:1px solid #1a4228">
+          <div style="font-size:10px;color:#445;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Approach recommendation</div>
+          <div id="profilerRecText" style="font-size:11px;color:#4ade80;line-height:1.9"></div>
+        </div>
+      </div>
+    </div><!-- /counterparty -->
+
+    <!-- UNKNOWN OWNER -->
+    <div id="mode-panel-unknown" style="display:none">
+      <div style="padding:14px;border-radius:8px;background:#0e0e22;border:1px solid #252535">
+        <div style="font-size:11px;font-weight:600;color:#a78bfa;margin-bottom:10px">Ask these directly before making any offer</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="padding:8px 12px;border-radius:5px;background:#0d1117;border:1px solid #1e2535">
+            <div style="font-size:11px;font-weight:600;color:#7ab3f5">"Are you playing to win this year or building for a future season?"</div>
+            <div style="font-size:10px;color:#445;margin-top:2px">→ Resolves time horizon. Most impactful single question.</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:5px;background:#0d1117;border:1px solid #1e2535">
+            <div style="font-size:11px;font-weight:600;color:#7ab3f5">"What's your biggest roster gap — pitching, hitting, or saves?"</div>
+            <div style="font-size:10px;color:#445;margin-top:2px">→ Determines which surplus to lead with.</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:5px;background:#0d1117;border:1px solid #1e2535">
+            <div style="font-size:11px;font-weight:600;color:#7ab3f5">"Prospects or established contributors — which do you lean toward?"</div>
+            <div style="font-size:10px;color:#445;margin-top:2px">→ Resolves asset preference. Determines sweetener type.</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:5px;background:#0d1117;border:1px solid #1e2535">
+            <div style="font-size:11px;font-weight:600;color:#7ab3f5">"High ceiling or reliable floor — which fits your roster?"</div>
+            <div style="font-size:10px;color:#445;margin-top:2px">→ Risk tolerance. Resolves ceiling vs floor splits.</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:5px;background:#0d1117;border:1px solid #1e2535">
+            <div style="font-size:11px;font-weight:600;color:#7ab3f5">"Are you looking to move any salary or is cap not a concern?"</div>
+            <div style="font-size:10px;color:#445;margin-top:2px">→ Reveals financial motivation. Over-cap owners must deal.</div>
+          </div>
+          <div style="padding:8px 12px;border-radius:5px;background:#0d1117;border:1px solid #1e2535">
+            <div style="font-size:11px;font-weight:600;color:#7ab3f5">"What year are you targeting to compete again?"</div>
+            <div style="font-size:10px;color:#445;margin-top:2px">→ Pins contention window for Pareto anchor weighting.</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:10px;color:#445">Once you have answers, switch to Counterparty mode and enter them to generate the full analysis.</div>
+      </div>
+    </div>
+
+    <!-- MY TEAM SELF -->
+    <div id="mode-panel-self" style="display:none">
+      <div style="font-size:11px;color:#556;margin-bottom:12px">Your declared preferences feed your side of the Pareto anchor.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><div class="q-label">Philosophy</div>
+          <div class="btn-group" id="self-q-horizon">
+            <button class="qbtn" data-prefix="self" data-qkey="horizon" data-qval="short">🏆 Win Now</button>
+            <button class="qbtn" data-prefix="self" data-qkey="horizon" data-qval="transitional">⚖️ Transitional</button>
+            <button class="qbtn" data-prefix="self" data-qkey="horizon" data-qval="long">🏗️ Rebuild</button>
+          </div></div>
+        <div><div class="q-label">Target year</div>
+          <div class="btn-group" id="self-q-year">
+            <button class="qbtn" data-prefix="self" data-qkey="year" data-qval="2026">2026</button>
+            <button class="qbtn" data-prefix="self" data-qkey="year" data-qval="2027">2027</button>
+            <button class="qbtn" data-prefix="self" data-qkey="year" data-qval="2028">2028</button>
+          </div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><div class="q-label">Asset preference</div>
+          <div class="btn-group" id="self-q-asset">
+            <button class="qbtn" data-prefix="self" data-qkey="asset" data-qval="prospects">🌱 Prospects</button>
+            <button class="qbtn" data-prefix="self" data-qkey="asset" data-qval="active_mlb">⚾ Active MLB</button>
+            <button class="qbtn" data-prefix="self" data-qkey="asset" data-qval="both">Both</button>
+          </div></div>
+        <div><div class="q-label">Roster gap</div>
+          <div class="btn-group" id="self-q-need">
+            <button class="qbtn" data-prefix="self" data-qkey="need" data-qval="pitching">⚾ Pitching</button>
+            <button class="qbtn" data-prefix="self" data-qkey="need" data-qval="hitting">🏏 Hitting</button>
+            <button class="qbtn" data-prefix="self" data-qkey="need" data-qval="closer">🔒 Closer</button>
+            <button class="qbtn" data-prefix="self" data-qkey="need" data-qval="bpa">BPA</button>
+          </div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><div class="q-label">Risk tolerance</div>
+          <div class="btn-group" id="self-q-risk">
+            <button class="qbtn" data-prefix="self" data-qkey="risk" data-qval="ceiling">🚀 Ceiling</button>
+            <button class="qbtn" data-prefix="self" data-qkey="risk" data-qval="either">⚖️ Either</button>
+            <button class="qbtn" data-prefix="self" data-qkey="risk" data-qval="floor">🛡 Floor</button>
+          </div></div>
+        <div><div class="q-label">Injury tolerance</div>
+          <div class="btn-group" id="self-q-injury">
+            <button class="qbtn" data-prefix="self" data-qkey="injury" data-qval="avoid">🚫 Avoid</button>
+            <button class="qbtn" data-prefix="self" data-qkey="injury" data-qval="accept_discount">💰 Accept</button>
+            <button class="qbtn" data-prefix="self" data-qkey="injury" data-qval="prefer_upside">⬆ Upside</button>
+          </div></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-secondary" id="saveSelfBtn" style="font-size:11px;padding:5px 12px">💾 Save My Profile</button>
+        <span id="selfSaved" style="font-size:11px;color:#4ade80;display:none">✓ Saved</span>
+      </div>
+    </div>
+  </div><!-- /owner profiles section -->
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" data-goto="1">← Back</button>
+    <button class="btn btn-primary" data-goto="3">Next: Analysis →</button>
+  </div>
+</div><!-- /panel-2 -->
+
+<!-- ══ STEP 3: ANALYSIS ═══════════════════════════════════════ -->
+<div class="panel" id="panel-3">
+  <div class="section">
+    <!-- SEQUENTIAL FLOW INDICATOR -->
+    <div style="display:flex;align-items:stretch;gap:0;margin-bottom:14px">
+      <!-- Step A -->
+      <div id="flow-a" class="flow-step flow-active">
+        <div class="flow-num">1</div>
+        <div class="flow-label">Load Analysis</div>
+        <div class="flow-sub">Gap · Financials · Cap</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <!-- Step B -->
+      <div id="flow-b" class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-label">Select Players</div>
+        <div class="flow-sub">Pick give · receive</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <!-- Step C -->
+      <div id="flow-c" class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-label">Trade Diagnostic</div>
+        <div class="flow-sub">Pareto · Bias · Rec</div>
+      </div>
+    </div>
+    <!-- CONTEXTUAL ACTION BUTTON + SECONDARY BUTTONS -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn-run" id="runBtn">⚡ 1 · Load Analysis</button>
+      <button class="btn btn-secondary" id="runPlayerBtn" style="font-size:11px;padding:8px 14px;display:none">👥 2 · Load Rosters</button>
+      <button class="btn btn-secondary" id="runTradeBtn" style="font-size:11px;padding:8px 14px;display:none;background:#1a1030;border-color:#7c3aed;color:#a78bfa">⚖️ 3 · Run Trade Diagnostic</button>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <span style="font-size:10px;color:#445" id="lastRunLabel"></span>
+        <button class="btn btn-secondary" id="loadGapBtn" style="font-size:10px;padding:5px 10px">📊 Gap</button>
+        <button class="btn btn-secondary" id="loadFinBtn" style="font-size:10px;padding:5px 10px">💰 Fin</button>
+      </div>
+    </div>
+    <div class="prog" style="margin-top:10px"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="log" id="runLog"><div class="log-dim">Connect and click Load Analysis to begin.</div></div>
+  </div>
+
+  <!-- BDE SUMMARY ROW -->
+  <div class="status-grid" id="resultGrid" style="display:none">
+    <div class="sc" id="bdeCapCard"><div class="sc-label" id="lbl-cap">Cap Space</div><div class="sc-val">—</div></div>
+    <div class="sc" id="bdeBudgetCard"><div class="sc-label" id="lbl-budget">Budget Left</div><div class="sc-val">—</div></div>
+    <div class="sc" id="bdeRankCard"><div class="sc-label" id="lbl-rank">Overall Rank</div><div class="sc-val">—</div></div>
+  </div>
+
+  <!-- GAP PRIORITY -->
+  <!-- CATEGORY FOCUS (above gap table) -->
+  <div class="section" id="catFocusSection" style="display:none">
+    <div class="stitle">🎯 Category Focus
+      <span style="font-size:10px;font-weight:400;color:#445;margin-left:4px">Select categories you want to improve — highlights in gap table and filters trade recommendations</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center" id="catChips">
+      <span style="font-size:9px;color:#445;align-self:center;margin-right:2px">PITCH +</span>
+      <button class="cat-chip" data-cat="Saves" onclick="toggleCatChip(this)">SV ×7</button>
+      <button class="cat-chip" data-cat="Quality Starts" onclick="toggleCatChip(this)">QS ×5</button>
+      <button class="cat-chip" data-cat="Holds + Pickoffs" onclick="toggleCatChip(this)">HLD ×4</button>
+      <button class="cat-chip" data-cat="Strikeouts Pitched" onclick="toggleCatChip(this)">K ×2.5</button>
+      <button class="cat-chip" data-cat="Innings Pitched" onclick="toggleCatChip(this)">IP ×1</button>
+      <span style="font-size:9px;color:#778;align-self:center;margin:0 4px">|</span>
+      <span style="font-size:9px;color:#f87171;align-self:center;margin-right:2px">PITCH −</span>
+      <button class="cat-chip" data-cat="Losses" style="border-color:#4a2010;color:#f87171" onclick="toggleCatChip(this)">L ×-5</button>
+      <button class="cat-chip" data-cat="Earned Runs Allowed" style="border-color:#4a2010;color:#f87171" onclick="toggleCatChip(this)">ER ×-1</button>
+      <button class="cat-chip" data-cat="Hits Allowed" style="border-color:#4a2010;color:#f87171" onclick="toggleCatChip(this)">HA ×-1</button>
+      <button class="cat-chip" data-cat="Walks Allowed" style="border-color:#4a2010;color:#f87171" onclick="toggleCatChip(this)">BB ×-1</button>
+      <span style="font-size:9px;color:#778;align-self:center;margin:0 4px">|</span>
+      <span style="font-size:9px;color:#445;align-self:center;margin-right:2px">HIT +</span>
+      <button class="cat-chip" data-cat="Home Runs" onclick="toggleCatChip(this)">HR ×4</button>
+      <button class="cat-chip" data-cat="Triples" onclick="toggleCatChip(this)">3B ×3</button>
+      <button class="cat-chip" data-cat="Doubles" onclick="toggleCatChip(this)">2B ×2</button>
+      <button class="cat-chip" data-cat="Stolen Bases" onclick="toggleCatChip(this)">SB ×2</button>
+      <button class="cat-chip" data-cat="Walks" onclick="toggleCatChip(this)">BB ×2</button>
+      <button class="cat-chip" data-cat="RBI" onclick="toggleCatChip(this)">RBI ×1</button>
+      <button class="cat-chip" data-cat="Runs Scored" onclick="toggleCatChip(this)">R ×1</button>
+      <button class="cat-chip" data-cat="Singles" onclick="toggleCatChip(this)">1B ×1</button>
+      <span style="font-size:9px;color:#778;align-self:center;margin:0 4px">|</span>
+      <span style="font-size:9px;color:#f87171;align-self:center;margin-right:2px">HIT −</span>
+      <button class="cat-chip" data-cat="Strikeouts" style="border-color:#4a2010;color:#f87171" onclick="toggleCatChip(this)">K ×-1</button>
+      <button class="cat-chip" data-cat="Grounded Into Double Plays" style="border-color:#4a2010;color:#f87171" onclick="toggleCatChip(this)">GIDP ×-2</button>
+      <span style="font-size:9px;color:#445;align-self:center;margin-left:8px;cursor:pointer" onclick="clearCatFocusFn()">✕ clear</span>
+    </div>
+    <div id="catFocusSummary" style="font-size:10px;color:#a78bfa;margin-top:6px;min-height:14px"></div>
+  </div>
+
+  <div class="section" id="gapSection" style="display:none">
+    <div class="stitle">📊 <span id="gapSectionTitle">My Team</span> Gap Priority
+      <span style="font-size:10px;font-weight:400;color:#445" id="gapWeekNote"></span>
+      <span id="cpVarianceNote" style="font-size:10px;font-weight:400;color:#a78bfa;margin-left:auto"></span>
+    </div>
+    <table class="gtable">
+      <thead><tr>
+        <th>Category</th><th>Mult</th><th>BDE Rank</th>
+        <th>BDE Pts</th><th>Leader Pts</th><th>Gap</th>
+        <th>Priority</th><th>Action</th>
+        <th id="cpRankHdr" style="display:none">CP Rank</th>
+        <th id="cpVarHdr"  style="display:none">Variance</th>
+      </tr></thead>
+      <tbody id="gapBody"></tbody>
+    </table>
+    <div style="font-size:10px;color:#445;margin-top:6px;line-height:1.7">
+      ✓ Complementary = BDE leads, counterparty trails (BDE has what they need) ·
+      ← BDE needs = standard ask ·
+      ⚠ Both gap = no trade incentive here
+    </div>
+  </div>
+
+  <!-- PLAYER SELECTOR -->
+  <div class="section" id="playerSection" style="display:none">
+    <div class="stitle">🔍 Player Selector
+      <span style="font-size:10px;font-weight:400;color:#445;margin-left:4px">Select players for live Pareto calculation</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <!-- COUNTERPARTY side -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#7ab3f5;margin-bottom:8px" id="cpPickerLabel">Counterparty Roster</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:#445;margin-bottom:5px">Filter by position — select one or more</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px" id="cpPosFilter">
+            <button class="pos-chip" data-pos="SP" onclick="this.classList.toggle('active')">SP</button>
+            <button class="pos-chip" data-pos="RP" onclick="this.classList.toggle('active')">RP</button>
+            <button class="pos-chip" data-pos="C" onclick="this.classList.toggle('active')">C</button>
+            <button class="pos-chip" data-pos="1B" onclick="this.classList.toggle('active')">1B/3B</button>
+            <button class="pos-chip" data-pos="2B" onclick="this.classList.toggle('active')">2B/SS</button>
+            <button class="pos-chip" data-pos="OF" onclick="this.classList.toggle('active')">OF</button>
+            <button class="pos-chip" data-pos="UT" onclick="this.classList.toggle('active')">UT</button>
+            <button class="pos-chip" data-pos="MINOR" onclick="this.classList.toggle('active')">Minors/Prospects</button>
+          </div>
+          <button class="btn btn-secondary" id="loadCpRosterBtn" style="font-size:11px;padding:5px 10px">↓ Load to Receive</button>
+          <button class="btn btn-secondary" id="clearCpFilter" style="font-size:11px;padding:5px 8px;margin-left:4px">Clear</button>
+        </div>
+        <div style="font-size:10px;color:#445;margin-bottom:6px">Click a player to mark as <span style="color:#7ab3f5">my team receives</span></div>
+        <div id="cpRosterList" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+      <!-- MY TEAM side -->
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#dc2626;margin-bottom:8px" id="myTeamPickerLabel">My Team Offering</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;color:#445;margin-bottom:5px">Filter by position — select one or more</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px" id="bdePosFilter">
+            <button class="pos-chip" data-pos="SP" onclick="this.classList.toggle('active')">SP</button>
+            <button class="pos-chip" data-pos="RP" onclick="this.classList.toggle('active')">RP</button>
+            <button class="pos-chip" data-pos="C" onclick="this.classList.toggle('active')">C</button>
+            <button class="pos-chip" data-pos="1B" onclick="this.classList.toggle('active')">1B/3B</button>
+            <button class="pos-chip" data-pos="2B" onclick="this.classList.toggle('active')">2B/SS</button>
+            <button class="pos-chip" data-pos="OF" onclick="this.classList.toggle('active')">OF</button>
+            <button class="pos-chip" data-pos="UT" onclick="this.classList.toggle('active')">UT</button>
+            <button class="pos-chip" data-pos="MINOR" onclick="this.classList.toggle('active')">Minors/Prospects</button>
+          </div>
+          <button class="btn btn-secondary" id="loadBdeRosterBtn" style="font-size:11px;padding:5px 10px">↑ Load to Give</button>
+          <button class="btn btn-secondary" id="clearBdeFilter" style="font-size:11px;padding:5px 8px;margin-left:4px">Clear</button>
+        </div>
+        <div style="font-size:10px;color:#445;margin-bottom:6px">Click a player to mark as <span style="color:#dc2626">my team gives</span></div>
+        <div id="bdeRosterList" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <!-- Live Pareto -->
+    <div id="livePareto" style="display:none;margin-top:14px;padding:14px;border-radius:8px;background:#0d1117;border:1px solid #1e2535">
+      <div style="font-size:10px;color:#445;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">
+        Live Pareto — updates as you select players
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;color:#7ab3f5;margin-bottom:4px" id="lbl-recv-pareto">receiving (mid projection)</div>
+        <div class="pbar-wrap"><div class="pbar-fill" id="pb-recv" style="background:#2a78d6;width:0%">
+          <span class="pbar-label" id="pb-recv-val">0 pts/yr</span>
+        </div></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:#dc2626;margin-bottom:4px" id="lbl-give-pareto">giving (mid projection)</div>
+        <div class="pbar-wrap"><div class="pbar-fill" id="pb-give" style="background:#dc2626;width:0%">
+          <span class="pbar-label" id="pb-give-val">0 pts/yr</span>
+        </div></div>
+      </div>
+      <div id="paretoResult" style="font-size:11px;line-height:1.8;padding:10px 12px;border-radius:6px;background:#111720"></div>
+      <div id="liveFiscal" style="margin-top:10px;font-size:11px;color:#556;line-height:1.8"></div>
+    </div>
+  </div>
+
+  <!-- TRADE DIAGNOSTIC -->
+  <div class="section" id="tradeSection" style="display:none">
+    <div class="stitle">⚖️ Trade Diagnostic
+      <span style="font-size:10px;font-weight:400;color:#445" id="tradeSectionLabel"></span>
+    </div>
+    <!-- Fiscal cards -->
+    <div class="trade-cards" id="fiscalGrid"></div>
+    <!-- Pareto visual -->
+    <div style="margin-bottom:14px" id="paretoViz"></div>
+    <!-- Delta grid -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="deltaGrid"></div>
+    <!-- Sweetener path -->
+    <div id="sweetenerPath" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;color:#7c3aed;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Sweetener escalation path</div>
+      <div id="sweetenerSteps"></div>
+    </div>
+    <!-- Bias flags -->
+    <div id="biasRows" style="margin-bottom:10px"></div>
+    <!-- Recommendation -->
+    <div id="tradeRec" style="display:none;padding:12px;border-radius:6px;background:#0a1210;border:1px solid #1a4228;font-size:11px;color:#4ade80;line-height:1.8"></div>
+  </div>
+
+  <div class="btn-row" style="margin-top:14px">
+    <button class="btn btn-secondary" data-goto="2">← Back</button>
+  </div>
+</div><!-- /panel-3 -->
+
+<script>
+// ══ STATE ════════════════════════════════════════════════════
+const S = { url:'', key:'', connected:false, myTeam:'BDE' };
+const profState = {horizon:null,year:null,asset:null,need:null,risk:null,injury:null,cap:null,motivation:null,response:null,history:null};
+const selfState = {horizon:'short',year:'2026',asset:'active_mlb',need:'hitting',risk:'either',injury:'accept_discount'};
+let currentMode = 'counterparty';
+// Player selection state
+const tradeState = { recv:[], give:[] }; // arrays of player objects
+
+// ══ CONSTANTS ════════════════════════════════════════════════
+const REVEALED = {
+  PALADINS:{horizon:'long',asset:'prospects',need:'pitching'},
+  DEATHSTROKE:{horizon:'unknown',asset:'unknown',need:'unknown'},
+  RIDDLE:{horizon:'unknown',asset:'both',need:'pitching'},
+};
+// Archetype assessments — BDE's intel only
+// Other users start with Unknown and build their own assessments via behavioral evidence
+const ARCH_BY_OWNER = {
+  BDE: {
+    PALADINS:'NameCollector',DEATHSTROKE:'RiskAverse',XENOMORPH:'Quant',
+    RIDDLE:'Quant',MASTERCHIEF:'GutFeel',RICKGRIMES:'Moderate',
+    PRIMEEVILS:'NameCollector',STARLORD:'GutFeel',DUKENUKEM:'NameCollector',
+    CRAZYHORSE:'GutFeel',HARU:'Unknown',MILLERS:'RiskAverse',IRONFIST:'RiskAverse',
+  }
+};
+function getArch(cpTeam) {
+  const mt = myTeam();
+  return (ARCH_BY_OWNER[mt] && ARCH_BY_OWNER[mt][cpTeam]) || 'Unknown';
+}
+// Intel gathered by BDE owner — only pre-fills when user selects BDE as their team
+// Other owners start with a clean slate and fill in their own intel
+const OWNER_INTEL = {
+  BDE: {
+    PALADINS:{horizon:'long',year:'2027',asset:'prospects',need:'pitching',
+              risk:'ceiling',injury:'prefer_upside',cap:'healthy',motivation:'build_future'},
+    DEATHSTROKE:{cap:'over',motivation:'cap_relief',response:'silent',history:'no_history'},
+    RIDDLE:{response:'counter',history:'no_history'},
+  }
+};
+// Returns known intel for a given counterparty, from the current user's perspective
+function getOwnerIntel(cpTeam) {
+  const mt = myTeam();
+  return (OWNER_INTEL[mt] && OWNER_INTEL[mt][cpTeam]) || {};
+}
+
+// ══ NAVIGATION ═══════════════════════════════════════════════
+function goStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('panel-'+i).classList.toggle('active', i===n);
+    document.getElementById('s'+i).classList.toggle('active', i===n);
+  });
+}
+
+// ══ SUPABASE HELPERS ═════════════════════════════════════════
+function sbBase() { return S.url || document.getElementById('sbUrl').value.trim(); }
+function myTeam() {
+  const sel = document.getElementById('myTeamSelect');
+  return (sel && sel.value) ? sel.value : (S.myTeam || 'BDE');
+}
+function sbKey()  { return S.key  || document.getElementById('sbKey').value.trim(); }
+function sbH(extra) {
+  const k = sbKey();
+  const base = {'Content-Type':'application/json', apikey:k, Authorization:'Bearer '+k, 'Prefer':'return=minimal'};
+  return Object.assign(base, extra||{});
+}
+function sbU(table, q) { return sbBase()+'/rest/v1/'+table+(q?'?'+q:''); }
+const sbSelect = (t,q)    => fetch(sbU(t,q), {method:'GET',   headers:sbH()});
+const sbPatch  = (t,f,p)  => fetch(sbU(t,f), {method:'PATCH', headers:sbH(), body:JSON.stringify(p)});
+const sbInsert = (t,p,res)=> fetch(sbU(t),   {method:'POST',  headers:sbH({'Prefer':'resolution='+(res||'ignore-duplicates')+',return=minimal'}), body:JSON.stringify(p)});
+const sbUpsert = (t,p)    => sbInsert(t, p, 'merge-duplicates');
+// For fantrax schema writes (prospect upload) — uses Content-Profile header
+function sbFantraxInsert(table, payload) {
+  const k = sbKey();
+  return fetch(sbBase()+'/rest/v1/'+table, {
+    method:'POST',
+    headers:{'Content-Type':'application/json', apikey:k, Authorization:'Bearer '+k,
+             'Content-Profile':'fantrax', 'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body: JSON.stringify(payload)
+  });
+}
+
+// ══ CONNECTION ═══════════════════════════════════════════════
+async function testConn() {
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  const res = document.getElementById('connResult');
+  const dot = document.getElementById('connDot');
+  const hdrStatus = document.getElementById('connStatus');
+  res.innerHTML = '<span style="color:#778">Step 1/3 — Reaching Supabase...</span>';
+  if(hdrStatus) hdrStatus.textContent = 'Connecting...';
+  try {
+    const r1 = await fetch(url+'/rest/v1/', {method:'GET', mode:'cors'});
+    res.innerHTML = '<span style="color:#778">Step 2/3 — Authenticating...</span>';
+    if(hdrStatus) hdrStatus.textContent = 'Authenticating...';
+    const r2 = await fetch(url+'/rest/v1/v_team_gap_priority?team_key=eq.'+(document.getElementById('myTeamSelect')&&document.getElementById('myTeamSelect').value||'BDE')+'&select=team_key&limit=1', {
+      headers:{apikey:key, Authorization:'Bearer '+key}
+    });
+    if (r2.status===401) { throw new Error('Auth failed (401) — check anon key'); }
+    if (r2.status===403) { throw new Error('Permission denied (403) — RLS policy may be missing for fantrax schema'); }
+    if (!r2.ok) { throw new Error('HTTP '+r2.status); }
+    res.innerHTML = '<span style="color:#778">Step 3/3 — Verifying data...</span>';
+    const d = await r2.json();
+    S.url = url; S.key = key; S.connected = true;
+    dot.className = 'dot ok';
+    document.getElementById('connStatus').textContent = 'Connected · '+url.replace('https://','');
+    res.innerHTML = '<span style="color:#4ade80">✓ Connected — all 3 checks passed. '+(document.getElementById('panel-1').classList.contains('active')?'':'Click Step 1 to see details.')+'</span>';
+    const nb=document.getElementById('step1NextBtn'); if(nb) nb.disabled=false;
+    await loadDataStatus();
+  } catch(e) {
+    dot.className = 'dot err'; S.connected = false;
+    const nb2=document.getElementById('step1NextBtn'); if(nb2) nb2.disabled=true;
+    const isCors = e.message.includes('Failed to fetch') || e.name==='TypeError';
+    res.innerHTML = '<span style="color:#f57373">✗ '+(isCors
+      ? 'Cannot reach Supabase — if using Claude preview, download and open locally'
+      : e.message)+'</span>';
+  }
+}
+
+async function loadDataStatus() {
+  try {
+    // Use public proxy views — same data, no schema headers needed
+    const [gapR, finR] = await Promise.all([
+      sbSelect('v_team_gap_priority','team_key=eq.'+myTeam()+'&select=category&limit=1'),
+      sbSelect('v_league_financials','select=team_key,overall_rank&team_key=eq.'+myTeam()+'&limit=1'),
+    ]);
+    const gapOk = gapR.ok && (await gapR.json()).length > 0;
+    const finOk = finR.ok && (await finR.json()).length > 0;
+
+    const cards = [
+      {label:'Gap Data', val:gapOk ? 'Ready' : 'No data',
+       sub:'v_team_gap_priority → fantrax.Fantrax_Standings_Hit/Pit', cls:gapOk?'ok':'warn'},
+      {label:'Financials', val:finOk ? 'Ready' : 'No data',
+       sub:'v_league_financials → fantrax players + cap data', cls:finOk?'ok':'warn'},
+      {label:'Source', val:'Fantrax ETL',
+       sub:'Refresh via ETL skill — no uploads needed', cls:'ok'},
+    ];
+    document.getElementById('dataStatusSection').style.display='block';
+    document.getElementById('dataStatusGrid').innerHTML = cards.map(c=>
+      '<div class="sc '+c.cls+'">'
+      +'<div class="sc-label">'+c.label+'</div>'
+      +'<div class="sc-val pos" style="font-size:14px">'+c.val+'</div>'
+      +'<div class="sc-sub">'+c.sub+'</div></div>'
+    ).join('');
+    if (tx.length) {
+      document.getElementById('dataAge').textContent = 'Data: '+tx[0].date_cdt.split('T')[0];
+    }
+  } catch(e) { console.warn('Status load:', e.message); }
+}
+
+// ══ LOG / PROGRESS ═══════════════════════════════════════════
+function log(msg, cls) {
+  const el = document.getElementById('runLog');
+  el.innerHTML += '<div class="'+(cls||'log-info')+'">'+new Date().toLocaleTimeString()+' — '+msg+'</div>';
+  el.scrollTop = el.scrollHeight;
+}
+function prog(pct) { document.getElementById('progFill').style.width=pct+'%'; }
+
+// ══ MAIN ANALYSIS RUNNER ══════════════════════════════════════
+async function runAnalysis() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled=true; btn.textContent='⏳ Loading...';
+  document.getElementById('runLog').innerHTML='';
+  document.getElementById('resultGrid').style.display='none';
+  prog(0);
+
+  const cpKey = document.getElementById('profTeam').value || null;
+  log('Loading analysis...','log-info');
+
+  const queries = [
+    sbSelect('v_team_gap_priority',
+      'team_key=eq.'+myTeam()+'&select=team_key,category,multiplier,rank,team_pts,leader_pts,gap_pts,priority_score,trade_priority&order=priority_score.desc'),
+    sbSelect('v_league_financials',
+      'select=team_key,team_name,annual_salary,annual_cap_space,budget_remaining,over_cap,cap_overage,trade_incentive,overall_rank'),
+  ];
+  if (cpKey) {
+    queries.push(
+      sbSelect('v_team_gap_priority',
+        'team_key=eq.'+cpKey+'&select=category,rank,team_pts,gap_pts&order=category.asc')
+    );
+  }
+
+  try {
+    prog(20);
+    const results = await Promise.all(queries);
+    prog(60);
+
+    const bdeGaps = results[0].ok ? await results[0].json() : [];
+    const finData = {};
+    if (results[1].ok) {
+      const fins = await results[1].json();
+      fins.forEach(f => finData[f.team_key] = f);
+      // Debug: log which keys loaded
+      const bdeRow = finData[myTeam()];
+      if (bdeRow) {
+        log('✓ Financials: '+fins.length+' teams · '+myTeam()+' cap space: $'+(parseFloat(bdeRow.annual_cap_space)/1e6).toFixed(1)+'M','log-ok');
+      } else {
+        log('⚠ Financials loaded ('+fins.length+' rows) but '+myTeam()+' key not found. Keys: '+Object.keys(finData).slice(0,5).join(', '),'log-warn');
+      }
+    }
+    let cpGaps = {};
+    if (results[2] && results[2].ok) {
+      const cp = await results[2].json();
+      cp.forEach(r => cpGaps[r.category] = r);
+    }
+
+    prog(80);
+
+    if (bdeGaps.length) {
+      renderGapTable(bdeGaps, cpGaps, cpKey);
+      log('✓ Gap priority: '+bdeGaps.length+' categories'+(cpKey?' + '+cpKey+' variance':''),'log-ok');
+    } else {
+      log('⚠ Gap data unavailable — check Fantrax_Standings_Hit/Pit tables','log-warn');
+    }
+
+    updateBdeCards(finData[myTeam()]);
+    updateOverCapWarning(finData);
+
+    // Show player selector if counterparty selected
+    const ps = document.getElementById('playerSection');
+    const cpLabel = document.getElementById('cpPickerLabel');
+    if (cpKey) {
+      ps.style.display='block';
+      cpLabel.textContent = (cpKey.charAt(0)+cpKey.slice(1).toLowerCase())+' Roster';
+    } else {
+      ps.style.display='none';
+    }
+
+    prog(100);
+    document.getElementById('resultGrid').style.display='grid';
+    document.getElementById('lastRunLabel').textContent='Last load: '+new Date().toLocaleTimeString();
+    log('Analysis ready.','log-ok');
+    setFlowStep('B');
+    refreshTeamLabels();
+  } catch(e) {
+    log('✗ Analysis failed: '+e.message,'log-err');
+  }
+  btn.disabled=false; btn.textContent='⚡ Load Analysis';
+}
+
+function updateBdeCards(bde) {
+  const fmt = v => {
+    const n = parseFloat(v);
+    if (v==null || isNaN(n)) return '—';
+    return (n<0?'-$':'$')+(Math.abs(n)/1e6).toFixed(1)+'M';
+  };
+  if (!bde) {
+    // Try to find BDE by scanning finData directly
+    console.warn('updateBdeCards: BDE not found in finData');
+    return;
+  }
+  const cap = document.getElementById('bdeCapCard');
+  const bud = document.getElementById('bdeBudgetCard');
+  const rnk = document.getElementById('bdeRankCard');
+  cap.className='sc '+(bde.annual_cap_space>0?'ok':'warn');
+  cap.innerHTML='<div class="sc-label">'+myTeam()+' Cap Space</div>'
+    +'<div class="sc-val '+(bde.annual_cap_space>0?'pos':'neg')+'">'+fmt(bde.annual_cap_space)+'</div>'
+    +'<div class="sc-sub">Annual salary space</div>';
+  bud.innerHTML='<div class="sc-label">'+myTeam()+' Budget Left</div>'
+    +'<div class="sc-val pos">'+fmt(bde.budget_remaining)+'</div>'
+    +'<div class="sc-sub">Cumulative remaining</div>';
+  rnk.innerHTML='<div class="sc-label">'+myTeam()+' Overall Rank</div>'
+    +'<div class="sc-val">#'+(bde.overall_rank||'—')+'</div>'
+    +'<div class="sc-sub">Topps league</div>';
+}
+
+function updateOverCapWarning(finData) {
+  const over = Object.values(finData).filter(f=>f.over_cap);
+  if (over.length) {
+    log('ℹ Over-cap teams (transactions blocked for them): '
+      +over.map(f=>f.team_name.replace(' (T)','')).join(', '),'log-info');
+  } else {
+    log('✓ All teams under cap','log-ok');
+  }
+}
+
+// ══ GAP TABLE ════════════════════════════════════════════════
+function renderGapTable(gaps, cpGaps, cpKey) {
+  const sec   = document.getElementById('gapSection');
+  const tbody = document.getElementById('gapBody');
+  const hasCp = cpKey && Object.keys(cpGaps).length > 0;
+  sec.style.display = 'block';
+  const cfs2=document.getElementById('catFocusSection');if(cfs2)cfs2.style.display='block';
+  document.getElementById('cpRankHdr').style.display = hasCp?'':'none';
+  document.getElementById('cpVarHdr').style.display  = hasCp?'':'none';
+  document.getElementById('cpVarianceNote').textContent = hasCp?'+ '+cpKey+' variance':'';
+
+  const maxS = Math.max(...gaps.map(g=>parseFloat(g.priority_score)||0), 1);
+
+  tbody.innerHTML = gaps.map(g => {
+    const score = parseFloat(g.priority_score)||0;
+    const mult  = parseFloat(g.multiplier)||0;
+    const gap   = parseFloat(g.gap_pts)||0;
+    const rank  = parseInt(g.rank)||0;
+    const bdeP  = parseFloat(g.team_pts)||0;
+    const ldrP  = parseFloat(g.leader_pts)||0;
+    const prio  = g.trade_priority||'';
+    let rCls='rb-low', bClr='#445', action='Monitor';
+    if (prio.includes('Elite'))  { rCls='rb-elite'; bClr='#1baf7a'; action='🔒 Protect'; }
+    else if (prio.includes('HIGH'))  { rCls='rb-high';  bClr='#2a78d6'; action='🎯 Acquire'; }
+    else if (prio.includes('MEDIUM')){ rCls='rb-med';   bClr='#7c3aed'; action='⚡ Pursue';  }
+    else if (mult<0)                 { rCls='rb-struct';bClr='#f57373'; action='Structural'; }
+    const bw = Math.round(score/maxS*100);
+
+    let cpCells = '';
+    if (hasCp) {
+      const cp = cpGaps[g.category];
+      const cpRk = cp ? parseInt(cp.rank)||0 : null;
+      const cpGp = cp ? parseFloat(cp.gap_pts)||0 : 0;
+      let varColor='#445', varNote='—';
+      if (cpRk!==null) {
+        if (gap>=0 && cpGp<0)       { varColor='#4ade80'; varNote='✓ Complementary'; }
+        else if (gap<0 && cpGp>=0)  { varColor='#7ab3f5'; varNote='← BDE needs'; }
+        else if (gap<0 && cpGp<0)   { varColor='#f5a742'; varNote='⚠ Both gap'; }
+        else                         { varColor='#445';    varNote='Both lead'; }
+      }
+      const cRb = cpRk!==null
+        ? '<span class="rb '+(cpRk<=5?'rb-elite':cpRk<=10?'rb-high':cpRk<=14?'rb-med':'rb-low')+'">#'+cpRk+'</span>'
+        : '<span style="color:#445">—</span>';
+      cpCells = '<td>'+cRb+'</td><td><span style="font-size:10px;color:'+varColor+'">'+varNote+'</span></td>';
+    }
+
+    return '<tr>'
+      +'<td>'+g.category+'</td>'
+      +'<td style="color:#f5a742">'+(mult>0?'+':'')+mult+'</td>'
+      +'<td><span class="rb '+rCls+'">#'+rank+'</span></td>'
+      +'<td>'+bdeP.toLocaleString(undefined,{maximumFractionDigits:0})+'</td>'
+      +'<td>'+ldrP.toLocaleString(undefined,{maximumFractionDigits:0})+'</td>'
+      +'<td style="color:'+(gap<0?'#f57373':'#4ade80')+'">'+(gap>=0?'+':'')+gap.toLocaleString(undefined,{maximumFractionDigits:0})+'</td>'
+      +'<td><span style="font-size:10px;color:#778;margin-right:3px">'+score.toLocaleString(undefined,{maximumFractionDigits:0})+'</span>'
+      +'<div class="mini-bar"><div class="mini-fill" style="width:'+bw+'%;background:'+bClr+'"></div></div></td>'
+      +'<td style="font-size:10px">'+action+'</td>'
+      +cpCells+'</tr>';
+  }).join('');
+}
+
+// ══ PLAYER SELECTOR ══════════════════════════════════════════
+async function loadRoster(teamKey, posFilters, listId, side) {
+  const listEl = document.getElementById(listId);
+  listEl.innerHTML = '<div style="font-size:11px;color:#445;padding:8px">Loading...</div>';
+
+  // posFilters is now an array of selected positions
+  const filters = Array.isArray(posFilters) ? posFilters : (posFilters ? [posFilters] : []);
+
+  let query = 'team_key=eq.'+teamKey
+    +'&select=player_name,position,pos_group,pts_actual_ytd,pts_min,pts_mid,pts_max,salary,contract_type,years_remaining,cost_tier'
+    +'&order=pts_mid.desc&limit=80';
+
+  if (filters.length > 0) {
+    const hasMinor = filters.includes('MINOR');
+    const posFils  = filters.filter(f => f !== 'MINOR');
+    if (hasMinor && posFils.length === 0) {
+      // Minors/Prospects: Minor contract OR FA at floor salary ($2M = prospect pickup)
+      // Use in.(Minor,FA) — display layer filters out expensive FA signings
+      query += '&contract_type=in.(Minor,FA)';
+    } else {
+      // Position filter — expand multi-pos groups
+      const expanded = [];
+      posFils.forEach(f => {
+        if (f==='2B') { expanded.push('2B','SS'); }
+        else if (f==='1B') { expanded.push('1B','3B'); }
+        else expanded.push(f);
+      });
+      const unique = [...new Set(expanded)];
+      if (unique.length === 1) query += '&pos_group=eq.'+unique[0];
+      else if (unique.length > 1) query += '&pos_group=in.('+unique.join(',')+')';
+      if (hasMinor) query += '&contract_type=in.(Minor,1st,2nd,3rd)';
+    }
+  }
+
+  try {
+    const r = await sbSelect('v_player_projections', query);
+    if (!r.ok) { listEl.innerHTML='<div style="color:#f57373;padding:8px;font-size:11px">Failed to load roster</div>'; return; }
+    const players = await r.json();
+    if (!players.length) { listEl.innerHTML='<div style="color:#445;padding:8px;font-size:11px">No players found</div>'; return; }
+
+    const fmt = v => v?'$'+(v/1e6).toFixed(1)+'M':'—';
+    // Prospect = Minor contract OR FA at $2M floor (prospect pickup)
+    const isMinor = p => p.contract_type==='Minor' || (p.contract_type==='FA' && parseFloat(p.salary) <= 2000000);
+
+    listEl.innerHTML = players.map(p => {
+      const isRecv = tradeState.recv.some(x=>x.player_name===p.player_name);
+      const isGive = tradeState.give.some(x=>x.player_name===p.player_name);
+      const cls = isRecv?'selected-recv':isGive?'selected-give':'';
+      const checkCls = isRecv?'recv':isGive?'give':'';
+      const checkVal = isRecv?'✓':isGive?'✓':'';
+      const minor = isMinor(p);
+      const contractBadge = minor
+        ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#1a1030;color:#a78bfa;border:1px solid #4a3aa7;margin-left:3px">'+(p.contract_type==='FA'?'FA-Pros':'Minor')+'</span>'
+        : '';
+      return '<div class="player-card '+cls+'" data-player="'+encodeURIComponent(JSON.stringify(p))+'" data-side="'+side+'">'
+        +'<div class="pc-check '+checkCls+'">'+checkVal+'</div>'
+        +'<div class="pc-name">'+p.player_name+contractBadge+'</div>'
+        +'<div class="pc-pos" style="font-size:10px;color:#445">'+p.position+'</div>'
+        +'<div class="pc-pts">'+(isMinor(p) ? (p.fv_numeric?'FV '+p.fv_numeric:'—') : (parseFloat(p.pts_mid)||0).toFixed(0)+' mid')+'</div>'
+        +'<div class="pc-sal">'+fmt(p.salary)+'</div>'
+        +'<div class="pc-contract" style="font-size:10px;color:#445">'+p.contract_type+'</div>'
+        +'</div>';
+    }).join('');
+
+    // Wire clicks
+    listEl.querySelectorAll('.player-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const p = JSON.parse(decodeURIComponent(card.dataset.player));
+        const cardSide = card.dataset.side;
+        togglePlayer(p, cardSide, teamKey, posFilters, listId);
+      });
+    });
+  } catch(e) {
+    listEl.innerHTML='<div style="color:#f57373;padding:8px;font-size:11px">'+e.message+'</div>';
+  }
+}
+
+function togglePlayer(p, side, teamKey, posFilters, listId) {
+  const arr = tradeState[side];
+  const idx = arr.findIndex(x=>x.player_name===p.player_name);
+  if (idx>=0) arr.splice(idx,1);
+  else arr.push(p);
+  loadRoster(teamKey, posFilters, listId, side);
+  onPlayerSelectionChanged();
+}
+
+function updateLivePareto() {
+  const lp = document.getElementById('livePareto');
+  if (!tradeState.recv.length && !tradeState.give.length) { lp.style.display='none'; return; }
+  lp.style.display='block';
+
+  const recvPts = tradeState.recv.reduce((s,p)=>s+(parseFloat(p.pts_mid)||0),0);
+  const givePts = tradeState.give.reduce((s,p)=>s+(parseFloat(p.pts_mid)||0),0);
+  const maxPts  = Math.max(recvPts, givePts, 1);
+
+  // Update dynamic labels
+  const lblR=document.getElementById('lbl-recv-pareto'); if(lblR) lblR.textContent=myTeam()+' receives (mid projection)';
+  const lblG=document.getElementById('lbl-give-pareto'); if(lblG) lblG.textContent=myTeam()+' gives (mid projection)';
+  // Bars
+  document.getElementById('pb-recv').style.width = Math.round(recvPts/maxPts*100)+'%';
+  document.getElementById('pb-recv-val').textContent = recvPts.toFixed(0)+' pts (mid)';
+  document.getElementById('pb-give').style.width = Math.round(givePts/maxPts*100)+'%';
+  document.getElementById('pb-give-val').textContent = givePts.toFixed(0)+' pts (mid)';
+
+  // Pareto check
+  const asymm = givePts>0 && recvPts>0
+    ? Math.abs(givePts-recvPts) / Math.max(givePts,recvPts) : null;
+  const pr = document.getElementById('paretoResult');
+  const fmtPts = v => v.toFixed(0);
+  if (!tradeState.recv.length || !tradeState.give.length) {
+    pr.innerHTML='<span style="color:#445">Select players on both sides to compute Pareto asymmetry</span>';
+  } else if (asymm!==null && asymm<=0.15) {
+    pr.style.background='#0a1210'; pr.style.border='1px solid #1a4228';
+    pr.innerHTML='<span style="color:#4ade80">✓ MUTUALLY PARETO EFFICIENT — asymmetry '+(asymm*100).toFixed(1)+'% ≤ 15% tolerance. Both sides within fair range.</span>';
+  } else if (asymm!==null) {
+    pr.style.background='#180808'; pr.style.border='1px solid #4a2010';
+    const higher = givePts>recvPts ? myTeam()+' is giving more' : myTeam()+' is receiving more';
+    pr.innerHTML='<span style="color:#f5a742">⚠ NOT YET EFFICIENT — asymmetry '+(asymm*100).toFixed(1)+'% > 15%. '
+      +higher+'. '+(givePts>recvPts?'Request a sweetener from counterparty or reduce give side.':'Consider adding to give side.')+'</span>';
+  }
+
+  // Fiscal
+  const recvSal = tradeState.recv.reduce((s,p)=>s+(parseFloat(p.salary)||0),0);
+  const giveSal = tradeState.give.reduce((s,p)=>s+(parseFloat(p.salary)||0),0);
+  const netCap  = giveSal - recvSal;
+  const fmt = v=>'$'+(Math.abs(v)/1e6).toFixed(1)+'M';
+  document.getElementById('liveFiscal').innerHTML =
+    myTeam()+' gives: '+fmt(giveSal)+'/yr salary · '
+    +myTeam()+' receives: '+fmt(recvSal)+'/yr salary · '
+    +'<strong style="color:'+(netCap>0?'#4ade80':'#f57373')+'">Net cap impact: '+(netCap>0?'+':'')+fmt(netCap)+'/yr '+(netCap>0?'relief':'cost')+'</strong>';
+}
+
+// ══ FINANCIALS ═══════════════════════════════════════════════
+async function loadFinancials() {
+  try {
+    const r = await sbSelect('v_league_financials',
+      'select=team_key,team_name,annual_salary,annual_cap_space,over_cap,cap_overage,budget_remaining,trade_incentive,overall_rank');
+    if (!r.ok) return;
+    const fins = await r.json();
+    const finData = {};
+    fins.forEach(f => finData[f.team_key] = f);
+    updateBdeCards(finData[myTeam()]);
+    updateOverCapWarning(finData);
+    document.getElementById('resultGrid').style.display='grid';
+    log('✓ Financials loaded','log-ok');
+  } catch(e) { log('⚠ Financials: '+e.message,'log-warn'); }
+}
+
+// ══ TRADE DIAGNOSTIC ═════════════════════════════════════════
+async function loadTradeDiagnostic() {
+  const sec = document.getElementById('tradeSection');
+  sec.style.display='block';
+  document.getElementById('resultGrid').style.display='grid';
+  document.getElementById('tradeSectionLabel').textContent = 'Loading...';
+  try {
+    const [trR, finR] = await Promise.all([
+      sbSelect('v_trade_diagnostic','proposal_id=eq.1&select=*'),
+      sbSelect('v_league_financials',
+        'select=team_key,team_name,annual_salary,annual_cap_space,budget_remaining,total_obligations,expiring_count,over_cap,cap_overage,trade_incentive'),
+    ]);
+    if (!trR.ok) { document.getElementById('tradeSectionLabel').textContent='No proposals found'; return; }
+    const rows = await trR.json();
+    if (!rows.length) { document.getElementById('tradeSectionLabel').textContent='No trade proposal found'; return; }
+    const d = rows[0];
+    const fins = finR.ok ? await finR.json() : [];
+    const finMap = {};
+    fins.forEach(f=>finMap[f.team_key]=f);
+
+    document.getElementById('tradeSectionLabel').textContent =
+      (d.give_team||'').replace(' (T)','') + ' ↔ ' + (d.recv_team||'').replace(' (T)','');
+
+    renderFiscalCards(d, finMap);
+    renderParetoViz(d);
+    renderDeltaGrid(d);
+    renderSweetener(d);
+    renderBias(d);
+    renderTradeRec(d);
+    updateBdeCards(finMap[myTeam()]);
+  } catch(e) {
+    document.getElementById('tradeSectionLabel').textContent = 'Error: '+e.message;
+  }
+}
+
+function renderFiscalCards(d, finMap) {
+  const gName = (d.give_team||myTeam()).replace(' (T)','');
+  const rName = (d.recv_team||'').replace(' (T)','');
+  const cpKey2 = rName || (document.getElementById('profTeam')&&document.getElementById('profTeam').value) || 'PALADINS';
+  const gF = finMap[myTeam()]||{}, rF = finMap[cpKey2]||{};
+  const fmt = v=>v&&Math.abs(v)>0?'$'+(Math.abs(v)/1e6).toFixed(1)+'M':'—';
+  const fmtS= v=>v!=null?(v<0?'-$':'$')+(Math.abs(v)/1e6).toFixed(1)+'M':'—';
+  const card = (title, rows, cls) =>
+    '<div class="trade-card" style="border-color:'+(cls==='warn'?'#4a2010':cls==='ok'?'#1a4228':'#1e2535')+';">'
+    +'<div class="tc-title">'+title+'</div>'
+    +rows.map(([lbl,val,color])=>
+      '<div class="tc-row"><span class="tc-label">'+lbl+'</span>'
+      +'<span class="tc-val" style="color:'+(color||'#c0c4d4')+'">'+val+'</span></div>'
+    ).join('')+'</div>';
+  document.getElementById('fiscalGrid').innerHTML =
+    card(gName+' — '+myTeam()+' Position', [
+      ['Annual salary',    fmt(gF.annual_salary),    '#c0c4d4'],
+      ['Cap space',        fmtS(gF.annual_cap_space), gF.annual_cap_space>0?'#4ade80':'#f57373'],
+      ['Budget remaining', fmt(gF.budget_remaining),  '#c0c4d4'],
+      ['Total obligations',fmt(gF.total_obligations), '#778'],
+      ['Cap status', gF.over_cap?'⚠ OVER CAP':'✓ Under cap', gF.over_cap?'#f57373':'#4ade80'],
+    ], gF.over_cap?'warn':'ok')
+    +card(rName+' — Counterparty Position', [
+      ['Annual salary',    fmt(rF.annual_salary),    '#c0c4d4'],
+      ['Cap space',        fmtS(rF.annual_cap_space), rF.annual_cap_space>0?'#4ade80':'#f57373'],
+      ['Budget remaining', fmt(rF.budget_remaining),  '#c0c4d4'],
+      ['Total obligations',fmt(rF.total_obligations), '#778'],
+      ['Trade incentive',  (rF.trade_incentive||'—').split('—')[0].trim(), '#a78bfa'],
+    ], rF.over_cap?'warn':'');
+}
+
+function renderParetoViz(d) {
+  const give = parseFloat(d.pareto_anchor_pts_give)||0;
+  const recv = parseFloat(d.pareto_anchor_pts_recv)||0;
+  const swC  = parseFloat(d.sweetener_pts_yr1_con)||0;
+  const swU  = parseFloat(d.sweetener_pts_yr1_up)||0;
+  const max  = Math.max(give, recv+swU, 1);
+  const gPct = Math.round(give/(max)*100);
+  const rPct = Math.round(recv/(max)*100);
+  const sPct = d.sweetener_closes_gap ? Math.round(swC/max*100) : 0;
+  const gName= (d.give_team||myTeam()).replace(' (T)','');
+  const rName= (d.recv_team||'').replace(' (T)','');
+  const eff  = d.pareto_efficient;
+
+  document.getElementById('paretoViz').innerHTML =
+    '<div style="font-size:10px;color:#445;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Pareto value — pts/yr each side receives</div>'
+    +'<div style="font-size:10px;color:#556;margin-bottom:4px">'+gName+' receives</div>'
+    +'<div class="pbar-wrap"><div class="pbar-fill" style="width:100%;background:#2a78d6"><span class="pbar-label">'+give.toFixed(0)+' pts/yr</span></div></div>'
+    +'<div style="font-size:10px;color:#556;margin-bottom:4px;margin-top:8px">'+rName+' receives (floor)</div>'
+    +'<div class="pbar-wrap">'
+    +'<div class="pbar-fill" style="width:'+rPct+'%;background:#dc2626"><span class="pbar-label">'+recv.toFixed(0)+' pts/yr</span></div>'
+    +(d.sweetener_closes_gap?'<div class="pbar-sweet" style="left:'+rPct+'%;width:'+sPct+'%"></div>':'')
+    +'</div>'
+    +(d.sweetener_closes_gap?'<div style="font-size:10px;color:#c084fc;margin-top:3px">+ '+d.sweetener_candidate+' → '+Math.round(recv+swC)+'–'+Math.round(recv+swU)+' pts/yr (closes within 15%)</div>':'')
+    +'<div style="margin-top:10px;padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.7;background:'+(eff?'#0a1210':'#1a0808')+';border:1px solid '+(eff?'#1a4228':'#dc2626')+';color:'+(eff?'#4ade80':'#f87171')+'">'+d.pareto_narrative+'</div>';
+}
+
+function renderDeltaGrid(d) {
+  const grid = document.getElementById('deltaGrid');
+  const gN = (d.give_team||myTeam()).replace(' (T)','');
+  const rN = (d.recv_team||'').replace(' (T)','');
+  const c = (lbl,v)=>{const n=parseFloat(v)||0;const clr=n>0?'#4ade80':n<0?'#f57373':'#778';
+    return '<div class="sc '+(n>0?'ok':n<0?'warn':'')+'"><div class="sc-label">'+lbl+'</div>'
+    +'<div class="sc-val" style="color:'+clr+';font-size:15px">'+(n>=0?'+':'')+Math.round(n).toLocaleString()+' pts</div></div>';};
+  grid.innerHTML=c(gN+' yr 1',d.short_term_delta_give)+c(rN+' yr 1',d.short_term_delta_recv)
+    +c(gN+' 5yr',d.long_term_delta_give)+c(rN+' 5yr',d.long_term_delta_recv);
+}
+
+function renderSweetener(d) {
+  const sec = document.getElementById('sweetenerPath');
+  if (!d.sweetener_closes_gap) { sec.style.display='none'; return; }
+  sec.style.display='block';
+  const recv=parseFloat(d.pareto_anchor_pts_recv)||0;
+  const con=parseFloat(d.sweetener_pts_yr1_con)||0;
+  const up=parseFloat(d.sweetener_pts_yr1_up)||0;
+  const step=(n,txt,warn)=>
+    '<div style="display:flex;gap:8px;padding:7px 10px;border-radius:5px;background:#0d1117;border:1px solid '+(warn?'#4a2010':'#1e2535')+';margin-bottom:5px">'
+    +'<div style="width:16px;height:16px;border-radius:50%;background:'+(warn?'#dc2626':'#7c3aed')
+    +';display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;flex-shrink:0">'+n+'</div>'
+    +'<div style="font-size:11px;color:'+(warn?'#f87171':'#778')+';line-height:1.6">'+txt+'</div></div>';
+  document.getElementById('sweetenerSteps').innerHTML=
+    step(1,'<strong>Floor offer:</strong> Core package only. If accepted — done. If declined → Step 2.')
+    +step(2,'<strong>Add '+d.sweetener_candidate+':</strong> Recv value rises from '+recv.toFixed(0)+' → '+Math.round(recv+con)+'–'+Math.round(recv+up)+' pts/yr. Closes within 15%.')
+    +step(3,'<strong>Alternate sweetener:</strong> Swap prospect for 2027 draft pick if Step 2 declined.')
+    +step('✗','<strong>Hard stops — never trade regardless of pressure:</strong> Baz, Palencia, Lombard Jr., Holliday, Yamamoto.',true);
+}
+
+function renderBias(d) {
+  const gN=(d.give_team||myTeam()).replace(' (T)','');
+  const rN=(d.recv_team||'').replace(' (T)','');
+  const row=(side,bias,mag,src)=>{const m=parseFloat(mag)||
+    +'<div style="flex:1;height:5px;background:#1e2535;border-radius:2px;overflow:hidden">'
+    +'<div style="width:'+Math.round(m*100)+'%;height:100%;background:'+clr+';border-radius:2px"></div></div>'
+    +'<span style="font-size:10px;color:#556;width:32px;text-align:right">'+m.toFixed(2)+'</span>'
+    +'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#1a1030;color:#a78bfa;border:1px solid #4a3aa7">'+src+'</span>'+conf+'</div>';};
+  document.getElementById('biasRows').innerHTML=
+    row(gN,d.dominant_bias_give,d.bias_magnitude_give,'Kahneman')
+    +row(rN,d.dominant_bias_recv,d.bias_magnitude_recv,'Thaler');
+}
+
+function renderTradeRec(d) {
+  const el=document.getElementById('tradeRec');
+  el.style.display='block';
+  const warn=d.confidence_met===false
+    ?'<div style="padding:7px 10px;border-radius:5px;background:#180a00;border:1px solid #4a2010;color:#f5a742;margin-bottom:8px;font-size:10px">⚠ '+(d.confidence_warning||'')+'</div>':'';
+  el.innerHTML=warn
+    +'<strong>Board of Trustees:</strong> '+d.recommendation+'<br>'
+    +'<strong>Pareto status:</strong> '+d.pareto_narrative;
+}
+
+// ══ PROFILER ═════════════════════════════════════════════════
+function setMode(mode) {
+  currentMode=mode;
+  ['counterparty','unknown','self'].forEach(m=>{
+    document.getElementById('mode-'+m).classList.toggle('selected',m===mode);
+    document.getElementById('mode-panel-'+m).style.display=m===mode?'block':'none';
+  });
+  if (mode==='self') prefillSelf();
+}
+
+function prefillSelf() {
+  Object.entries(selfState).forEach(([k,v])=>{
+    const g=document.getElementById('self-q-'+k);
+    if(g) g.querySelectorAll('.qbtn').forEach(b=>b.classList.toggle('selected',b.dataset.qval===v));
+  });
+}
+
+function loadProfileData() {
+  const team=document.getElementById('profTeam').value;
+  const qs=document.getElementById('profilerQuestions');
+  const sp=document.getElementById('saveProfileBtn');
+  if(!team){qs.style.display='none';sp.style.display='none';return;}
+  qs.style.display='block';sp.style.display='inline-block';
+  const saved=document.getElementById('profileSaved');if(saved)saved.style.display='none';
+  document.querySelectorAll('#mode-panel-counterparty .qbtn[data-prefix="cp"]').forEach(b=>b.classList.remove('selected'));
+  Object.keys(profState).forEach(k=>profState[k]=null);
+  document.querySelectorAll('.schism').forEach(el=>{el.textContent='';el.className='schism';});
+  document.getElementById('profilerRec').style.display='none';
+  const pf=getOwnerIntel(team);
+  if(Object.keys(pf).length) setTimeout(()=>{Object.entries(pf).forEach(([k,v])=>setQ('cp',k,v,team));updateRec();},50);
+}
+
+function setQ(prefix,key,val,team) {
+  const st=prefix==='self'?selfState:profState;
+  st[key]=val;
+  const g=document.getElementById(prefix+'-q-'+key);
+  if(g){g.querySelectorAll('.qbtn').forEach(b=>b.classList.remove('selected'));
+    const t=g.querySelector('[data-qval="'+val+'"]');if(t)t.classList.add('selected');}
+  if(prefix==='cp'&&team){
+    const rev=REVEALED[team]||{};
+    const el=document.getElementById('cp-schism-'+key);
+    if(el&&rev[key]&&rev[key]!=='unknown'){
+      el.className='schism '+(val!==rev[key]?'schism-high':'schism-ok');
+      el.textContent=val!==rev[key]
+        ?'⚠ Schism: stated "'+val+'" vs observed "'+rev[key]+'"'
+        :'✓ Consistent with observed behavior';
+    }
+  }
+}
+
+function updateRec() {
+  const team=document.getElementById('profTeam').value;
+  const arch=getArch(team);
+  const {horizon,year,asset,need,risk,injury,cap,motivation,response,history}=profState;
+  const rec=document.getElementById('profilerRec');
+  if(!horizon&&!need&&!cap&&!motivation){rec.style.display='none';return;}
+  rec.style.display='block';
+  const tactics={Quant:'Lead with format-adjusted pts data.',NameCollector:'Lead with names and pedigree — not math.',
+    GutFeel:'Under 100 words. One binary choice.',RiskAverse:'Smallest possible ask. No-pressure framing.',
+    Moderate:'Direct offer.',Unknown:'Run the Unknown Owner questions first.'};
+  const lines=['<strong>Approach ('+arch+'):</strong> '+(tactics[arch]||tactics.Unknown)];
+  if(horizon==='long'){lines.push('<strong>Frame:</strong> 2027+ window assets. Control years and ETA.');if(year)lines.push('<strong>Target:</strong> '+year+' window.');}
+  else if(horizon==='short') lines.push('<strong>Frame:</strong> Current-year impact and QS rate.');
+  if(asset==='prospects') lines.push('<strong>Currency:</strong> Prospects + FV / format flag overlay.');
+  else if(asset==='active_mlb') lines.push('<strong>Currency:</strong> Active MLB contributors.');
+  const nMap={pitching:myTeam()+" SP surplus. Lead K/9 and QS rate.",hitting:'Hitting depth — wRC+, format flags.',
+    closer:'Palencia or Uceta. Frame as save upside.',prospects:'FV + ETA. BB_BOOST / CMD_BONUS flags.',bpa:'Highest-value asset regardless of position.'};
+  if(need&&nMap[need]) lines.push('<strong>Lead with:</strong> '+nMap[need]);
+  if(injury==='avoid') lines.push('<strong>IR assets:</strong> Exclude Uceta and Palencia entirely.');
+  else if(injury==='prefer_upside') lines.push('<strong>IR assets:</strong> Uceta/Palencia viable — 2027 comeback arc.');
+  if(cap==='over') lines.push('<strong>⚠ Cap:</strong> OVER CAP — transactions blocked. Cap relief is primary motivation.');
+  else if(cap==='tight') lines.push('<strong>Cap:</strong> Near cap — will resist absorbing salary.');
+  if(motivation==='cap_relief') lines.push('<strong>Motivation:</strong> Needs cap relief — move salary first.');
+  if(response==='silent') lines.push('<strong>⚠ Response:</strong> Silent — reframe before re-approaching.');
+  else if(response==='counter') lines.push('<strong>Response:</strong> Always counters — build negotiating room.');
+  if(history==='declined_offers') lines.push('<strong>History:</strong> Declined BDE offers — reframe entirely.');
+  else if(history==='initiated') lines.push('<strong>History:</strong> They initiated — let them make the first concrete offer.');
+  document.getElementById('profilerRecText').innerHTML=lines.join('<br>');
+}
+
+async function saveProfile() {
+  const team=document.getElementById('profTeam').value;if(!team)return;
+  const btn=document.getElementById('saveProfileBtn');
+  btn.disabled=true;btn.textContent='⏳...';
+  try{
+    await sbPatch('teams','team_key=eq.'+team,{
+      time_horizon:profState.horizon||'unknown',
+      rebuild_year:profState.year&&profState.year!=='2029+'?parseInt(profState.year):null,
+      asset_pref:profState.asset||'unknown',roster_need:profState.need||'unknown',
+      risk_pref:profState.risk||'unknown',injury_pref:profState.injury||'unknown',
+      motivation:profState.motivation||'unknown',
+    });
+    const s=document.getElementById('profileSaved');if(s)s.style.display='inline';
+  }catch(e){}
+  btn.disabled=false;setTimeout(()=>btn.textContent='💾 Save',3000);
+}
+
+async function saveSelfProfile(){
+  const btn=document.getElementById('saveSelfBtn');
+  btn.disabled=true;btn.textContent='⏳...';
+  try{
+    await sbPatch('teams','team_key=eq.'+myTeam(),{
+      time_horizon:selfState.horizon||'short',
+      rebuild_year:selfState.year?parseInt(selfState.year):null,
+      asset_pref:selfState.asset||'active_mlb',roster_need:selfState.need||'hitting',
+      risk_pref:selfState.risk||'either',injury_pref:selfState.injury||'accept_discount',
+    });
+    const s=document.getElementById('selfSaved');if(s)s.style.display='inline';
+  }catch(e){}
+  btn.disabled=false;setTimeout(()=>btn.textContent='💾 Save My Profile',3000);
+}
+
+// ══ PROSPECT UPLOAD ══════════════════════════════════════════
+const uploadFiles={hitters:null,pitchers:null};
+
+function fileLoaded(loader,name,text){
+  uploadFiles[loader]={name,text};
+  const uz=document.getElementById('uz-'+loader);
+  if(uz){uz.classList.add('loaded');const t=document.getElementById('uz-'+loader+'-title');if(t)t.innerHTML='<span class="uz-ok">✓ '+name+'</span>';}
+  document.getElementById('uploadProspectsBtn').disabled=!(uploadFiles.hitters&&uploadFiles.pitchers);
+}
+
+async function uploadProspects(){
+  const btn=document.getElementById('uploadProspectsBtn');
+  const res=document.getElementById('uploadResult');
+  btn.disabled=true;btn.textContent='⏳ Uploading...';res.textContent='';
+  let h=0,p=0,errs=[];
+  const parseCSV=text=>{
+    const ls=text.split('\n').filter(l=>l.trim());
+    if(!ls.length)return[];
+    const hds=ls[0].split(',').map(h=>h.replace(/"/g,'').trim());
+    return ls.slice(1).map(l=>{const vs=l.split(',');const o={};
+      hds.forEach((h,i)=>o[h]=(vs[i]||'').replace(/"/g,'').trim());return o;
+    }).filter(r=>Object.values(r).some(v=>v));
+  };
+  const parseNum=v=>{if(!v)return null;const n=parseFloat(v);return isNaN(n)?null:n;};
+  const BDE=new Set(['Franklin Arias','George Lombard Jr.','Jackson Holliday','Braylon Doughty',
+    'Shane Baz','Edwin Uceta','Daniel Palencia','Jhonny Level','Connor Prielipp']);
+  for(const [key,ptype] of [['hitters','H'],['pitchers','P']]){
+    if(!uploadFiles[key])continue;
+    for(const row of parseCSV(uploadFiles[key].text)){
+      const name=(row['Name']||'').trim();if(!name)continue;
+      const bb=parseNum(row['BB%'])||0,k=parseNum(row['K%'])||0;
+      let flag='NEUTRAL';
+      if(ptype==='H'){const f=[];if(bb>=.14)f.push('BB_BOOST');if(k>=.28)f.push('K_PENALTY');if(bb<.07)f.push('LOW_BB');flag=f.join('|')||'NEUTRAL';}
+      else{const f=[];if(k>=.30)f.push('K_BOOST');if(k<.22)f.push('LOW_K');if(bb>=.14)f.push('BB_PENALTY');if(bb<.07)f.push('CMD_BONUS');flag=f.join('|')||'NEUTRAL';}
+      const fvStr=String(row['FV']||'');
+      const fvNum=fvStr.endsWith('+')?parseFloat(fvStr)+.5:parseFloat(fvStr)||null;
+      const r=await sbFantraxInsert('prospect_ratings',
+        {player_name:name,mlb_org:row['Org']||'',pos:row['Pos']||'',
+          level:row['Current Level']||'',age:parseNum(row['Age']),
+          fv:fvStr,fv_numeric:fvNum,fg_rank:parseInt(row['Top 100'])||null,
+          bb_pct:bb,k_pct:k,wrc_plus:parseNum(row['wRC+']),xfip:parseNum(row['xFIP']),
+          gb_pct:parseNum(row['GB%']),format_flag:flag,player_type:ptype,is_bde_prospect:BDE.has(name)});
+      if(r.ok){if(ptype==='H')h++;else p++;}else errs.push(name);
+    }
+  }
+  res.style.color=errs.length?'#f5a742':'#4ade80';
+  res.textContent='✓ '+h+' hitters, '+p+' pitchers'+(errs.length?' ('+errs.length+' errors)':'');
+  btn.disabled=false;btn.textContent='Upload Prospect Ratings';
+}
+
+// ══ FLOW STATE ════════════════════════════════════════════════
+// Three-step: A=Load Analysis, B=Select Players, C=Trade Diagnostic
+function setFlowStep(step) {
+  // A: active, B: locked, C: locked
+  const a = document.getElementById('flow-a');
+  const b = document.getElementById('flow-b');
+  const c = document.getElementById('flow-c');
+  const runPlayerBtn  = document.getElementById('runPlayerBtn');
+  const runTradeBtn   = document.getElementById('runTradeBtn');
+
+  if (step === 'A') {
+    if(a){a.className='flow-step flow-active';}
+    if(b){b.className='flow-step';}
+    if(c){c.className='flow-step';}
+    if(runPlayerBtn) runPlayerBtn.style.display='none';
+    if(runTradeBtn)  runTradeBtn.style.display='none';
+  } else if (step === 'B') {
+    if(a){a.className='flow-step flow-done';}
+    if(b){b.className='flow-step flow-active';}
+    if(c){c.className='flow-step';}
+    if(runPlayerBtn) runPlayerBtn.style.display='inline-block';
+    if(runTradeBtn)  runTradeBtn.style.display='none';
+  } else if (step === 'C') {
+    if(a){a.className='flow-step flow-done';}
+    if(b){b.className='flow-step flow-done';}
+    if(c){c.className='flow-step flow-ready';}
+    if(runPlayerBtn) runPlayerBtn.style.display='inline-block';
+    if(runTradeBtn)  runTradeBtn.style.display='inline-block';
+  }
+}
+
+// Called whenever player selection changes
+function onPlayerSelectionChanged() {
+  const hasRecv = tradeState.recv.length > 0;
+  const hasGive = tradeState.give.length > 0;
+  if (hasRecv || hasGive) setFlowStep('C');
+  updateLivePareto();
+}
+
+// ══ CATEGORY FOCUS ═══════════════════════════════════════════
+const focusedCats = new Set();
+
+function clearCatFocusFn() {
+  focusedCats.clear();
+  document.querySelectorAll('.cat-chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#gapBody tr').forEach(r=>{
+    r.style.opacity='1'; r.style.background='';
+  });
+  const sum=document.getElementById('catFocusSummary');
+  if(sum) sum.textContent='';
+}
+
+function toggleCatChip(btn) {
+  const cat = btn.dataset.cat;
+  if (focusedCats.has(cat)) {
+    focusedCats.delete(cat);
+    btn.classList.remove('active');
+  } else {
+    focusedCats.add(cat);
+    btn.classList.add('active');
+  }
+  // Update summary
+  const sum = document.getElementById('catFocusSummary');
+  if (sum) {
+    sum.textContent = focusedCats.size > 0
+      ? 'Focused on: ' + [...focusedCats].join(', ') + ' — gap table rows highlighted'
+      : '';
+  }
+  // Highlight matching rows in gap table
+  document.querySelectorAll('#gapBody tr').forEach(row => {
+    const cat = row.cells[0] ? row.cells[0].textContent.trim() : '';
+    if (focusedCats.size === 0) {
+      row.style.opacity = '1';
+    } else if (focusedCats.has(cat)) {
+      row.style.opacity = '1';
+      row.style.background = '#0e0e22';
+    } else {
+      row.style.opacity = '0.35';
+      row.style.background = '';
+    }
+  });
+}
+
+// Helper: get selected pos chips from a filter container
+function getSelectedChips(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  return [...container.querySelectorAll('.pos-chip.active')].map(b=>b.dataset.pos);
+}
+
+// ══ TRADE DIAGNOSTIC FROM PLAYER SELECTION ══════════════════
+async function runTradeFromSelection() {
+  const btn = document.getElementById('runTradeBtn');
+  if (!tradeState.recv.length && !tradeState.give.length) {
+    log('Select players on both sides first','log-warn'); return;
+  }
+  btn.textContent='⏳ Running...'; btn.disabled=true;
+
+  const recvPts = tradeState.recv.reduce((s,p)=>s+(parseFloat(p.pts_mid)||0),0);
+  const givePts = tradeState.give.reduce((s,p)=>s+(parseFloat(p.pts_mid)||0),0);
+  const recvSal = tradeState.recv.reduce((s,p)=>s+(parseFloat(p.salary)||0),0);
+  const giveSal = tradeState.give.reduce((s,p)=>s+(parseFloat(p.salary)||0),0);
+  const max     = Math.max(recvPts,givePts,1);
+  const asymm   = givePts>0&&recvPts>0 ? Math.abs(givePts-recvPts)/Math.max(givePts,recvPts) : null;
+  const cpKey   = document.getElementById('profTeam').value||'Counterparty';
+  const fmt     = v=>'$'+(Math.abs(v)/1e6).toFixed(1)+'M';
+  const fmtS    = v=>(v<0?'-$':'$')+(Math.abs(v)/1e6).toFixed(1)+'M';
+  const netCap  = giveSal - recvSal;
+
+  // Load financials for both teams
+  const finR = await sbSelect('v_league_financials',
+    'select=team_key,team_name,annual_salary,annual_cap_space,budget_remaining,total_obligations,over_cap');
+  const finMap = {};
+  if (finR.ok) { const fins = await finR.json(); fins.forEach(f=>finMap[f.team_key]=f); }
+  const bdeF = finMap[myTeam()]||{};
+  const cpF  = finMap[cpKey]||{};
+
+  const sec = document.getElementById('tradeSection');
+  sec.style.display='block';
+  sec.scrollIntoView({behavior:'smooth',block:'start'});
+
+  const label = document.getElementById('tradeSectionLabel');
+  const rNames = tradeState.recv.map(p=>p.player_name).join(', ');
+  const gNames = tradeState.give.map(p=>p.player_name).join(', ');
+  label.textContent = myTeam()+' receives: '+rNames+' · '+myTeam()+' gives: '+gNames;
+
+  // Fiscal cards
+  document.getElementById('fiscalGrid').innerHTML = [
+    {title:myTeam()+' — Current Position', fin:bdeF, netLabel:'Net cap impact this deal',
+     netVal:fmtS(netCap), netColor:netCap>0?'#4ade80':'#f57373'},
+    {title:(cpKey)+' — Counterparty', fin:cpF, netLabel:'Salary BDE gives them',
+     netVal:fmt(recvSal), netColor:'#778'},
+  ].map(({title,fin,netLabel,netVal,netColor})=>
+    '<div class="trade-card" style="border-color:'+(fin.over_cap?'#4a2010':'#1e2535')+'">'
+    +'<div class="tc-title">'+title+'</div>'
+    +'<div class="tc-row"><span class="tc-label">Annual salary</span>'
+    +'<span class="tc-val">'+fmt(fin.annual_salary||0)+'</span></div>'
+    +'<div class="tc-row"><span class="tc-label">Cap space</span>'
+    +'<span class="tc-val" style="color:'+(fin.annual_cap_space>0?'#4ade80':'#f57373')+'">'+fmtS(fin.annual_cap_space||0)+'</span></div>'
+    +'<div class="tc-row"><span class="tc-label">Budget remaining</span>'
+    +'<span class="tc-val">'+fmt(fin.budget_remaining||0)+'</span></div>'
+    +'<div class="tc-row"><span class="tc-label">'+netLabel+'</span>'
+    +'<span class="tc-val" style="color:'+netColor+'">'+netVal+'</span></div>'
+    +(fin.over_cap?'<div style="font-size:10px;color:#f57373;margin-top:4px">⚠ OVER CAP — transactions BLOCKED</div>':'')
+    +'</div>'
+  ).join('');
+
+  // Pareto viz
+  const recvPct = Math.round(recvPts/max*100);
+  const givePct = Math.round(givePts/max*100);
+  const eff = asymm!==null && asymm <= 0.15;
+  document.getElementById('paretoViz').innerHTML =
+    '<div style="font-size:10px;color:#445;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Pareto value — pts/yr mid projection</div>'
+    +'<div style="font-size:10px;color:#7ab3f5;margin-bottom:4px">'+myTeam()+' receives: '
+    +tradeState.recv.map(p=>p.player_name).join(' + ')+'</div>'
+    +'<div class="pbar-wrap"><div class="pbar-fill" style="width:100%;background:#2a78d6">'
+    +'<span class="pbar-label">'+recvPts.toFixed(0)+' pts/yr</span></div></div>'
+    +'<div style="font-size:10px;color:#dc2626;margin-bottom:4px;margin-top:8px">'+myTeam()+' gives: '
+    +tradeState.give.map(p=>p.player_name).join(' + ')+'</div>'
+    +'<div class="pbar-wrap"><div class="pbar-fill" style="width:'+givePct+'%;background:#dc2626">'
+    +'<span class="pbar-label">'+givePts.toFixed(0)+' pts/yr</span></div></div>'
+    +'<div style="margin-top:10px;padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.7;'
+    +'background:'+(eff?'#0a1210':'#1a0808')+';border:1px solid '+(eff?'#1a4228':'#dc2626')
+    +';color:'+(eff?'#4ade80':'#f87171')+'">'
+    +(eff
+      ? '✓ MUTUALLY PARETO EFFICIENT — asymmetry '+(asymm*100).toFixed(1)+'% ≤ 15%. Both sides within tolerance.'
+      : asymm!==null
+        ? '⚠ NOT YET EFFICIENT — asymmetry '+(asymm*100).toFixed(1)+'%. '
+          +(givePts>recvPts?myTeam()+' is giving more value. Add a sweetener or reduce give side.'
+                           :myTeam()+' is receiving more value. May need to add to give side.')
+        : 'Select players on both sides to compute Pareto efficiency.')
+    +'</div>';
+
+  // Delta grid
+  const recvYrs = tradeState.recv.length
+    ? Math.max(...tradeState.recv.map(p=>parseInt(p.years_remaining)||1)) : 1;
+  const giveYrs = tradeState.give.length
+    ? Math.max(...tradeState.give.map(p=>parseInt(p.years_remaining)||1)) : 1;
+  document.getElementById('deltaGrid').innerHTML = [
+    [myTeam()+' yr 1',  recvPts - givePts],
+    [cpKey+' yr 1', givePts - recvPts],
+    [myTeam()+(recvYrs>1?' '+recvYrs+'yr':' yr1'), (recvPts-givePts)*Math.min(recvYrs,3)],
+    [cpKey+' '+(giveYrs>1?giveYrs+'yr':'yr1'), (givePts-recvPts)*Math.min(giveYrs,3)],
+  ].map(([lbl,v])=>{
+    const clr=v>0?'#4ade80':v<0?'#f57373':'#778';
+    return '<div class="sc '+(v>0?'ok':v<0?'warn':'')+'"><div class="sc-label">'+lbl+'</div>'
+      +'<div class="sc-val" style="color:'+clr+';font-size:15px">'
+      +(v>=0?'+':'')+Math.round(v).toLocaleString()+' pts</div></div>';
+  }).join('');
+
+  // Recommendation based on profiler data
+  const rec = document.getElementById('tradeRec');
+  rec.style.display='block';
+  const arch = ARCH_FROM_DATA[cpKey]||'Unknown';
+  const tactics={Quant:'Lead with pts data and projections.',
+    NameCollector:'Lead with names and pedigree.',
+    GutFeel:'One binary choice. Under 100 words.',
+    RiskAverse:'Smallest possible ask. No-pressure framing.',
+    Moderate:'Direct offer.',Unknown:'Run diagnostic questions first.'};
+  const needText = profState.need
+    ? ' Their primary need is '+profState.need+' — lead with that.' : '';
+  const capText = profState.cap==='over'
+    ? ' They are OVER CAP — cap relief is their primary motivation.' : '';
+  rec.innerHTML =
+    '<strong>Board of Trustees:</strong> '
+    +(eff
+      ? 'Deal is within Pareto tolerance. '+(tactics[arch]||'')+ needText+capText+' Present the offer.'
+      : asymm!==null&&asymm>0.15
+        ? 'Not yet efficient — '+((givePts>recvPts)?'request a sweetener from counterparty.':'consider adding to your give side.')
+          +' '+(tactics[arch]||'')
+        : 'Select players on both sides to generate recommendation.')
+    +'<br><strong>Net cap impact:</strong> '
+    +(netCap>0?'+'+fmt(netCap)+' cap relief for BDE':'-'+fmt(Math.abs(netCap))+' additional cap cost');
+
+  // Clear sweetener and bias sections (come from static proposals, not live selection)
+  document.getElementById('sweetenerPath').style.display='none';
+  document.getElementById('biasRows').innerHTML='<div style="font-size:11px;color:#445;padding:6px 0">Bias diagnostics available for saved trade proposals · '
+    +'<span style="color:#7ab3f5;cursor:pointer" id="loadStaticProposalLink">Load saved proposal</span></div>';
+  document.getElementById('loadStaticProposalLink').addEventListener('click', loadTradeDiagnostic);
+
+  document.getElementById('resultGrid').style.display='grid';
+  updateBdeCards(bdeF);
+  log('✓ Trade diagnostic complete','log-ok');
+  btn.textContent='⚖️ 3 · Run Trade Diagnostic'; btn.disabled=false;
+}
+
+// ══ TEAM LABEL REFRESH ═══════════════════════════════════════
+// Module-scope so runAnalysis, setFlowStep, etc. can all call it
+function refreshTeamLabels() {
+  const t = myTeam();
+  const lc=document.getElementById('lbl-cap');    if(lc) lc.textContent=t+' Cap Space';
+  const lb=document.getElementById('lbl-budget'); if(lb) lb.textContent=t+' Budget Left';
+  const lr=document.getElementById('lbl-rank');   if(lr) lr.textContent=t+' Overall Rank';
+  const gt=document.getElementById('gapSectionTitle'); if(gt) gt.textContent=t;
+  const tr=document.getElementById('thMyRank');   if(tr) tr.textContent=t+' Rank';
+  const tp=document.getElementById('thMyPts');    if(tp) tp.textContent=t+' Pts';
+  const ol=document.getElementById('myTeamPickerLabel'); if(ol) ol.textContent=t+' Offering';
+  const rb=document.getElementById('runPlayerBtn'); if(rb && rb.textContent.startsWith('👥')) rb.textContent='👥 2 · Load Rosters ('+t+')';
+  // Update profile subtitle hints
+  document.querySelectorAll('.my-team-label').forEach(el => el.textContent=t);
+  // Update CP picker label with counterparty name
+  const cpl=document.getElementById('cpPickerLabel');
+  if(cpl){
+    const cp=document.getElementById('profTeam');
+    const cpName=cp&&cp.options[cp.selectedIndex]&&cp.value?cp.options[cp.selectedIndex].text:'Counterparty';
+    cpl.textContent=cpName+' Roster (select to receive)';
+  }
+  const mpl=document.getElementById('myTeamPickerLabel');
+  if(mpl) mpl.textContent=t+' Roster (select to give)';
+}
+
+// ══ DOM READY ════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+  // Step navigation
+  document.querySelectorAll('.step[data-step]').forEach(b=>
+    b.addEventListener('click',()=>goStep(parseInt(b.dataset.step))));
+  document.querySelectorAll('[data-goto]').forEach(b=>
+    b.addEventListener('click',()=>goStep(parseInt(b.dataset.goto))));
+
+  // Connection
+  document.getElementById('testConnBtn').addEventListener('click', testConn);
+  document.getElementById('step1NextBtn').addEventListener('click',()=>goStep(2));
+
+  // Admin accordion
+  document.getElementById('adminToggle').addEventListener('click',()=>{
+    const body=document.getElementById('adminBody');
+    const chev=document.getElementById('adminChevron');
+    const open=body.classList.toggle('open');
+    chev.textContent=open?'▲ collapse':'▼ expand';
+  });
+
+  // File uploads
+  document.querySelectorAll('.uz input[type=file][data-loader]').forEach(inp=>{
+    inp.addEventListener('change',function(){
+      const f=this.files[0];if(!f)return;
+      const reader=new FileReader();
+      reader.onload=e=>fileLoaded(this.dataset.loader,f.name,e.target.result);
+      reader.readAsText(f);
+    });
+  });
+  document.querySelectorAll('.uz').forEach(zone=>{
+    zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+    zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+    zone.addEventListener('drop',e=>{
+      e.preventDefault();zone.classList.remove('drag');
+      const f=e.dataTransfer.files[0];if(!f)return;
+      const inp=zone.querySelector('input[data-loader]');if(!inp)return;
+      const reader=new FileReader();
+      reader.onload=ev=>fileLoaded(inp.dataset.loader,f.name,ev.target.result);
+      reader.readAsText(f);
+    });
+  });
+  document.getElementById('uploadProspectsBtn').addEventListener('click',uploadProspects);
+
+  // Mode tabs
+  document.querySelectorAll('[data-mode]').forEach(b=>
+    b.addEventListener('click',()=>setMode(b.dataset.mode)));
+
+  // Q buttons
+  document.querySelectorAll('.qbtn[data-qkey]').forEach(b=>
+    b.addEventListener('click',()=>{
+      const prefix=b.dataset.prefix||'cp';
+      const team=document.getElementById('profTeam').value;
+      setQ(prefix,b.dataset.qkey,b.dataset.qval,team);
+      if(prefix==='cp') updateRec();
+    }));
+
+  // Profile
+  document.getElementById('profTeam').addEventListener('change',loadProfileData);
+  document.getElementById('saveProfileBtn').addEventListener('click',saveProfile);
+  document.getElementById('saveSelfBtn').addEventListener('click',saveSelfProfile);
+
+  // Analysis buttons
+  document.getElementById('runBtn').addEventListener('click',runAnalysis);
+  const runPlayerBtn2=document.getElementById('runPlayerBtn');
+  if(runPlayerBtn2) {
+  runPlayerBtn2.textContent='👥 2 · Load Rosters ('+myTeam()+')';
+  runPlayerBtn2.addEventListener('click',()=>{
+    const cp=document.getElementById('profTeam').value;
+    const ps=document.getElementById('playerSection');
+    ps.style.display='block';
+    ps.scrollIntoView({behavior:'smooth',block:'start'});
+    if(cp){ loadRoster(cp,getSelectedChips('cpPosFilter'),'cpRosterList','recv'); }
+    loadRoster(myTeam(),getSelectedChips('bdePosFilter'),'bdeRosterList','give');
+  });
+  }
+  const runTradeBtn2=document.getElementById('runTradeBtn');
+  if(runTradeBtn2) runTradeBtn2.addEventListener('click',runTradeFromSelection);
+
+  document.getElementById('loadGapBtn').addEventListener('click',async()=>{
+    document.getElementById('resultGrid').style.display='grid';
+    const cpKey=document.getElementById('profTeam').value||null;
+    const [bR,cR]=await Promise.all([
+      sbSelect('v_team_gap_priority',
+        'team_key=eq.'+myTeam()+'&select=team_key,category,multiplier,rank,team_pts,leader_pts,gap_pts,priority_score,trade_priority&order=priority_score.desc'),
+      cpKey?sbSelect('v_team_gap_priority',
+        'team_key=eq.'+cpKey+'&select=category,rank,team_pts,gap_pts&order=category.asc')
+        :Promise.resolve(null),
+    ]);
+    const gaps=bR.ok?await bR.json():[];
+    const cpG={};if(cR&&cR.ok){const d=await cR.json();d.forEach(r=>cpG[r.category]=r);}
+    renderGapTable(gaps,cpG,cpKey);
+    log('✓ Gap priority loaded'+(cpKey?' + '+cpKey+' variance':''),'log-ok');
+  });
+
+  document.getElementById('loadFinBtn').addEventListener('click',loadFinancials);
+  document.getElementById('loadTradeBtn').addEventListener('click',loadTradeDiagnostic);
+
+  // Chip clicks handled via inline onclick attributes
+  // Clear pos filters
+  const clearCpFilter = document.getElementById('clearCpFilter');
+  if(clearCpFilter) clearCpFilter.addEventListener('click',()=>{
+    document.querySelectorAll('#cpPosFilter .pos-chip').forEach(c=>c.classList.remove('active'));
+  });
+  const clearBdeFilter = document.getElementById('clearBdeFilter');
+  if(clearBdeFilter) clearBdeFilter.addEventListener('click',()=>{
+    document.querySelectorAll('#bdePosFilter .pos-chip').forEach(c=>c.classList.remove('active'));
+  });
+  // Player selector — load rosters
+  document.getElementById('loadCpRosterBtn').addEventListener('click',()=>{
+    const cp=document.getElementById('profTeam').value;
+    if(!cp){log('Select a counterparty in Profiles first','log-warn');return;}
+    const pos=getSelectedChips('cpPosFilter');
+    loadRoster(cp,pos,'cpRosterList','recv');
+    document.getElementById('playerSection').style.display='block';
+  });
+  document.getElementById('loadBdeRosterBtn').addEventListener('click',()=>{
+    const pos=getSelectedChips('bdePosFilter');
+    loadRoster(myTeam(),pos,'bdeRosterList','give');
+    document.getElementById('playerSection').style.display='block';
+  });
+
+  // Pre-load credentials
+  S.url=document.getElementById('sbUrl').value;
+  S.key=document.getElementById('sbKey').value;
+  S.myTeam=document.getElementById('myTeamSelect').value||'BDE';
+  // refreshTeamLabels defined at module scope below
+  document.getElementById('myTeamSelect').addEventListener('change',function(){
+    S.myTeam=this.value;
+    refreshTeamLabels();
+    // Hide own team from counterparty dropdown
+    const profTeam=document.getElementById('profTeam');
+    if(profTeam) {
+      [...profTeam.options].forEach(o=>{
+        o.style.display=(o.value && o.value===this.value)?'none':'';
+      });
+      if(profTeam.value===this.value) profTeam.value='';
+    }
+    // Reset profiler when team changes
+    document.getElementById('profilerQuestions').style.display='none';
+    document.getElementById('saveProfileBtn').style.display='none';
+  });
+  // Run on page load to hide BDE from CP dropdown by default
+  (function(){
+    const mt=document.getElementById('myTeamSelect').value;
+    const profTeam=document.getElementById('profTeam');
+    if(profTeam&&mt) [...profTeam.options].forEach(o=>{
+      o.style.display=(o.value&&o.value===mt)?'none':'';
+    });
+  })();
+}); // end DOMContentLoaded
+</script>
+</body>
+</html>
